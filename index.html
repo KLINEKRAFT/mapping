@@ -1,0 +1,1620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>WALL MAP CO. // KLINEKRAFT</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Bree+Serif&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* ——— Filson palette ——— */
+    --tin-cloth:        #2d3a2a;   /* signature waxed canvas dark green */
+    --tin-cloth-deep:   #1f2a1d;
+    --tin-cloth-light:  #3f4f38;
+    --tin-cloth-edge:   #14201c;
+
+    --leather:          #6b4423;
+    --leather-light:    #8b5a2b;
+    --leather-dark:     #3d2613;
+
+    --brass:            #a8843d;
+    --brass-light:      #c89e4f;
+    --brass-deep:       #6e5424;
+    --brass-shadow:     #3d2f15;
+
+    --cream:            #f0e8d4;
+    --cream-warm:       #e8dfc8;
+    --cream-deep:       #d8cdb0;
+
+    --ink:              #1a1f1a;
+    --ink-faded:        #4a5448;
+
+    /* ——— Functional ——— */
+    --bg:               var(--tin-cloth);
+    --panel:            var(--tin-cloth-light);
+    --text:             var(--cream);
+    --text-dim:         var(--cream-deep);
+    --text-faint:       #b8a989;
+    --accent:           var(--brass-light);
+    --accent-deep:      var(--brass);
+
+    --serif:    'Bree Serif', Georgia, serif;
+    --sans:     'Inter', system-ui, sans-serif;
+    --mono:     'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    grid-template-rows: 100vh;
+  }
+
+  /* ============ TIN CLOTH TEXTURE ============ */
+  /* Subtle dimpled waxed-canvas weave. SVG embedded as background. */
+  .tin-bg {
+    background-color: var(--tin-cloth);
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0.05 0 0 0 0 0.08 0 0 0 0 0.04 0 0 0 0.18 0'/></filter><rect width='80' height='80' filter='url(%23n)' opacity='0.7'/></svg>"),
+      linear-gradient(135deg, var(--tin-cloth-light) 0%, var(--tin-cloth) 50%, var(--tin-cloth-deep) 100%);
+    background-size: 80px 80px, 100% 100%;
+  }
+
+  /* ============ SIDEBAR ============ */
+  .sidebar {
+    position: relative;
+    border-right: 3px solid var(--tin-cloth-edge);
+    box-shadow:
+      inset -1px 0 0 rgba(0, 0, 0, 0.4),
+      4px 0 12px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .sidebar::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: var(--tin-cloth);
+    background-image:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80' viewBox='0 0 80 80'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='5'/><feColorMatrix values='0 0 0 0 0.05 0 0 0 0 0.08 0 0 0 0 0.04 0 0 0 0.18 0'/></filter><rect width='80' height='80' filter='url(%23n)' opacity='0.7'/></svg>"),
+      linear-gradient(135deg, var(--tin-cloth-light) 0%, var(--tin-cloth) 60%, var(--tin-cloth-deep) 100%);
+    background-size: 80px 80px, 100% 100%;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .sidebar > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Custom scrollbar — brass on tin cloth */
+  .sidebar::-webkit-scrollbar { width: 8px; }
+  .sidebar::-webkit-scrollbar-track { background: var(--tin-cloth-deep); }
+  .sidebar::-webkit-scrollbar-thumb {
+    background: var(--brass-deep);
+    border-radius: 4px;
+    border: 1px solid var(--brass-shadow);
+  }
+
+  /* ============ HEADER ============ */
+  .sidebar-header {
+    padding: 24px 28px 22px;
+    background:
+      linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.18)),
+      linear-gradient(180deg, var(--leather-dark), var(--leather));
+    border-bottom: 4px solid var(--brass-deep);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+      0 2px 0 rgba(0, 0, 0, 0.3);
+    position: relative;
+  }
+
+  /* Stitching along the bottom of the leather header */
+  .sidebar-header::after {
+    content: '';
+    position: absolute;
+    left: 12px; right: 12px;
+    bottom: 8px;
+    border-bottom: 1px dashed rgba(240, 232, 212, 0.35);
+    pointer-events: none;
+  }
+
+  .sidebar-header .brand {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    color: var(--brass-light);
+    margin-bottom: 8px;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  }
+
+  .sidebar-header h1 {
+    font-family: var(--serif);
+    font-size: 28px;
+    font-weight: 400;
+    letter-spacing: 0.01em;
+    color: var(--cream);
+    line-height: 1.05;
+    text-shadow:
+      0 1px 0 rgba(0, 0, 0, 0.6),
+      0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+
+  .sidebar-header .subtitle {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--text-faint);
+    margin-top: 8px;
+    letter-spacing: 0.18em;
+    opacity: 0.75;
+  }
+
+  /* ============ SECTION ============ */
+  .section {
+    padding: 22px 28px;
+    border-bottom: 1px solid var(--tin-cloth-edge);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  }
+
+  .section-label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    color: var(--brass-light);
+    margin-bottom: 14px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  }
+
+  .section-label::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    background:
+      radial-gradient(circle at 30% 30%, var(--brass-light), var(--brass-deep));
+    border-radius: 50%;
+    box-shadow:
+      inset 0 -1px 1px var(--brass-shadow),
+      0 0 0 1px var(--brass-shadow),
+      0 1px 2px rgba(0, 0, 0, 0.5);
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--brass-deep), transparent);
+    opacity: 0.4;
+  }
+
+  /* ============ STYLE PILLS ============ */
+  .style-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .style-pill {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 50%),
+      linear-gradient(180deg, var(--tin-cloth-light), var(--tin-cloth-deep));
+    border: 1px solid var(--tin-cloth-edge);
+    color: var(--text-dim);
+    padding: 8px 14px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    transition: all 0.15s ease;
+    border-radius: 12px;
+    white-space: nowrap;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 1px 2px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  }
+
+  .style-pill:hover {
+    color: var(--cream);
+    border-color: var(--brass-deep);
+  }
+
+  .style-pill.active {
+    background:
+      linear-gradient(180deg, var(--brass-light), var(--brass) 60%, var(--brass-deep));
+    color: var(--leather-dark);
+    border-color: var(--brass-shadow);
+    font-weight: 700;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 1px var(--brass-shadow),
+      0 1px 2px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .style-warning {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--brass-deep);
+    border-left-width: 3px;
+    background:
+      linear-gradient(135deg, rgba(168, 132, 61, 0.12), rgba(168, 132, 61, 0.04));
+    color: var(--brass-light);
+    font-family: var(--mono);
+    font-size: 10px;
+    line-height: 1.5;
+    letter-spacing: 0.02em;
+    display: none;
+  }
+
+  .style-warning.visible { display: block; }
+
+  /* ============ PAGE SIZE GRID ============ */
+  .size-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+
+  .size-btn {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 50%),
+      linear-gradient(180deg, var(--tin-cloth-light), var(--tin-cloth-deep));
+    border: 1px solid var(--tin-cloth-edge);
+    color: var(--text-dim);
+    padding: 12px 8px;
+    cursor: pointer;
+    font-family: var(--serif);
+    font-size: 13px;
+    transition: all 0.15s ease;
+    text-align: center;
+    border-radius: 4px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 1px 2px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  }
+
+  .size-btn:hover {
+    color: var(--cream);
+    border-color: var(--brass-deep);
+  }
+
+  .size-btn.active {
+    background:
+      linear-gradient(180deg, var(--brass-light), var(--brass) 60%, var(--brass-deep));
+    color: var(--leather-dark);
+    border-color: var(--brass-shadow);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 1px var(--brass-shadow),
+      0 1px 2px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .size-btn .dim {
+    display: block;
+    font-family: var(--mono);
+    font-size: 9px;
+    letter-spacing: 0.05em;
+    color: inherit;
+    opacity: 0.7;
+    margin-top: 3px;
+  }
+
+  /* ============ ORIENT / TOOL ROWS ============ */
+  .orient-row, .tool-row {
+    display: grid;
+    gap: 6px;
+  }
+  .orient-row { grid-template-columns: 1fr 1fr; }
+  .tool-row   { grid-template-columns: 1fr 1fr 1fr; }
+
+  .orient-btn, .tool-btn {
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 50%),
+      linear-gradient(180deg, var(--tin-cloth-light), var(--tin-cloth-deep));
+    border: 1px solid var(--tin-cloth-edge);
+    color: var(--text-dim);
+    padding: 10px 8px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    transition: all 0.15s ease;
+    border-radius: 4px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 1px 2px rgba(0, 0, 0, 0.4);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  }
+
+  .orient-btn:hover, .tool-btn:hover { color: var(--cream); border-color: var(--brass-deep); }
+
+  .orient-btn.active, .tool-btn.active {
+    background:
+      linear-gradient(180deg, var(--brass-light), var(--brass) 60%, var(--brass-deep));
+    color: var(--leather-dark);
+    border-color: var(--brass-shadow);
+    font-weight: 700;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.4),
+      inset 0 -1px 1px var(--brass-shadow),
+      0 1px 2px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  /* ============ LAYERS PANEL ============ */
+  .layers-block {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 2px;
+  }
+
+  .toggle-row label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--cream);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  }
+
+  /* Brass switch */
+  .brass-switch {
+    position: relative;
+    width: 44px;
+    height: 22px;
+    cursor: pointer;
+    background: var(--tin-cloth-deep);
+    border-radius: 11px;
+    border: 1px solid var(--tin-cloth-edge);
+    box-shadow:
+      inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  }
+
+  .brass-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 30% 30%, var(--brass-light), var(--brass-deep));
+    box-shadow:
+      inset 0 -1px 2px var(--brass-shadow),
+      0 1px 2px rgba(0, 0, 0, 0.6);
+    transition: transform 0.15s ease;
+  }
+
+  .brass-switch.on {
+    background: linear-gradient(180deg, var(--leather-dark), var(--leather));
+    box-shadow:
+      inset 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+
+  .brass-switch.on::after { transform: translateX(22px); }
+
+  /* Segmented control for label density / road weight */
+  .segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--tin-cloth-edge);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow:
+      inset 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+
+  .segmented button {
+    background: var(--tin-cloth-deep);
+    border: none;
+    border-right: 1px solid var(--tin-cloth-edge);
+    color: var(--text-dim);
+    padding: 8px 4px;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 9.5px;
+    letter-spacing: 0.1em;
+    transition: all 0.15s ease;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.4);
+  }
+
+  .segmented button:last-child { border-right: none; }
+
+  .segmented button:hover { color: var(--cream); }
+
+  .segmented button.active {
+    background:
+      linear-gradient(180deg, var(--brass-light), var(--brass) 60%, var(--brass-deep));
+    color: var(--leather-dark);
+    font-weight: 700;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.3),
+      inset 0 -1px 1px var(--brass-shadow);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  /* Color swatches */
+  .color-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .color-swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--tin-cloth-edge);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.3),
+      0 1px 2px rgba(0, 0, 0, 0.5);
+    transition: transform 0.15s ease;
+    position: relative;
+  }
+
+  .color-swatch:hover { transform: scale(1.08); }
+
+  .color-swatch.active {
+    border-color: var(--brass-light);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.2),
+      inset 0 -1px 2px rgba(0, 0, 0, 0.3),
+      0 0 0 2px var(--brass-light),
+      0 1px 4px rgba(0, 0, 0, 0.5);
+  }
+
+  /* ============ SELECTION CONTROLS ============ */
+  .radius-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .radius-input {
+    flex: 1;
+    background: var(--cream);
+    border: 1px solid var(--leather-dark);
+    color: var(--ink);
+    padding: 8px 10px;
+    font-family: var(--mono);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    border-radius: 3px;
+    box-shadow:
+      inset 0 1px 2px rgba(0, 0, 0, 0.3);
+  }
+
+  .radius-input:focus { border-color: var(--brass); }
+
+  .radius-input-row label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--cream);
+    letter-spacing: 0.1em;
+  }
+
+  .help-text {
+    font-family: var(--mono);
+    font-size: 9.5px;
+    color: var(--text-faint);
+    margin-top: 12px;
+    line-height: 1.6;
+    letter-spacing: 0.02em;
+  }
+
+  /* ============ INFO PANEL — paper card ============ */
+  .info-card {
+    background:
+      url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.4' numOctaves='3'/><feColorMatrix values='0 0 0 0 0.6 0 0 0 0 0.55 0 0 0 0 0.45 0 0 0 0.08 0'/></filter><rect width='100' height='100' filter='url(%23p)'/></svg>"),
+      linear-gradient(180deg, var(--cream) 0%, var(--cream-warm) 100%);
+    background-size: 100px 100px, 100% 100%;
+    color: var(--ink);
+    padding: 16px;
+    border: 1px solid var(--leather-dark);
+    border-radius: 3px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      0 2px 4px rgba(0, 0, 0, 0.4);
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.7;
+  }
+
+  .info-card .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    border-bottom: 1px dotted rgba(0, 0, 0, 0.15);
+  }
+
+  .info-card .info-row:last-child { border-bottom: none; }
+
+  .info-card .info-label {
+    color: var(--ink-faded);
+    letter-spacing: 0.1em;
+    font-size: 9px;
+    text-transform: uppercase;
+  }
+
+  .info-card .info-value {
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* ============ DOWNLOAD — leather + brass plate ============ */
+  .download-section {
+    padding: 24px 28px 28px;
+    margin-top: auto;
+    background:
+      linear-gradient(180deg, var(--leather-dark), var(--leather) 60%, var(--leather-dark));
+    border-top: 4px solid var(--brass-deep);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      inset 0 4px 8px rgba(0, 0, 0, 0.3);
+    position: relative;
+  }
+
+  /* Stitching at top of leather panel */
+  .download-section::before {
+    content: '';
+    position: absolute;
+    left: 12px; right: 12px;
+    top: 8px;
+    border-bottom: 1px dashed rgba(240, 232, 212, 0.35);
+    pointer-events: none;
+  }
+
+  .download-btn {
+    width: 100%;
+    background:
+      linear-gradient(180deg, var(--brass-light) 0%, var(--brass) 50%, var(--brass-deep) 100%);
+    color: var(--leather-dark);
+    border: 1px solid var(--brass-shadow);
+    padding: 18px 20px;
+    font-family: var(--serif);
+    font-size: 16px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 3px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.5),
+      inset 0 -2px 2px var(--brass-shadow),
+      0 2px 4px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+  }
+
+  .download-btn:hover:not(:disabled) {
+    background:
+      linear-gradient(180deg, #d4ad5a 0%, var(--brass-light) 50%, var(--brass) 100%);
+    transform: translateY(-1px);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.6),
+      inset 0 -2px 2px var(--brass-shadow),
+      0 4px 8px rgba(0, 0, 0, 0.6);
+  }
+
+  .download-btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow:
+      inset 0 2px 4px rgba(0, 0, 0, 0.4),
+      0 1px 2px rgba(0, 0, 0, 0.4);
+  }
+
+  .download-btn:disabled {
+    background: var(--tin-cloth-deep);
+    color: var(--text-faint);
+    cursor: not-allowed;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  }
+
+  .download-btn .arrow {
+    font-family: var(--serif);
+    font-size: 20px;
+  }
+
+  .download-status {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--cream-deep);
+    margin-top: 12px;
+    text-align: center;
+    letter-spacing: 0.15em;
+    min-height: 14px;
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  }
+
+  .download-status.error { color: #e8a4a4; }
+  .download-status.success { color: #b6d4a8; }
+
+  /* ============ MAP AREA ============ */
+  .map-container {
+    position: relative;
+    overflow: hidden;
+    background: var(--tin-cloth-deep);
+    border-left: 1px solid var(--brass-shadow);
+  }
+
+  #map {
+    position: absolute;
+    inset: 0;
+  }
+
+  /* Page boundary overlay */
+  .page-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .page-frame {
+    position: absolute;
+    border: 2px solid var(--brass-light);
+    box-shadow:
+      0 0 0 9999px rgba(20, 32, 28, 0.55),
+      0 0 24px rgba(168, 132, 61, 0.4);
+    pointer-events: none;
+    transition: width 0.3s ease, height 0.3s ease;
+  }
+
+  .page-corner {
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-color: var(--brass-light);
+    border-style: solid;
+  }
+
+  .page-corner.tl { top: -2px; left: -2px; border-width: 2px 0 0 2px; }
+  .page-corner.tr { top: -2px; right: -2px; border-width: 2px 2px 0 0; }
+  .page-corner.bl { bottom: -2px; left: -2px; border-width: 0 0 2px 2px; }
+  .page-corner.br { bottom: -2px; right: -2px; border-width: 0 2px 2px 0; }
+
+  .page-label {
+    position: absolute;
+    top: -32px;
+    left: 0;
+    font-family: var(--serif);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--cream);
+    background:
+      linear-gradient(180deg, var(--leather-dark), var(--leather));
+    padding: 5px 12px;
+    border: 1px solid var(--brass-deep);
+    border-radius: 2px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 2px 4px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  }
+
+  /* Mapbox controls restyle */
+  .mapboxgl-ctrl-group {
+    background: var(--leather-dark) !important;
+    border: 1px solid var(--brass-deep) !important;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 2px 6px rgba(0, 0, 0, 0.5) !important;
+    border-radius: 3px !important;
+  }
+
+  .mapboxgl-ctrl-group button {
+    background-color: transparent !important;
+  }
+
+  .mapboxgl-ctrl-group button + button {
+    border-top: 1px solid var(--brass-shadow) !important;
+  }
+
+  .mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
+    filter: invert(0.85) sepia(0.4) saturate(1.5) hue-rotate(355deg);
+  }
+
+  .mapboxgl-ctrl-attrib {
+    background: rgba(45, 58, 42, 0.9) !important;
+    color: var(--cream-deep) !important;
+  }
+
+  .mapboxgl-ctrl-attrib a { color: var(--brass-light) !important; }
+
+  /* Brass plate at bottom-left */
+  .footer-info {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--cream-deep);
+    background:
+      linear-gradient(180deg, var(--leather-dark), var(--leather));
+    border: 1px solid var(--brass-deep);
+    padding: 8px 14px;
+    z-index: 5;
+    letter-spacing: 0.1em;
+    border-radius: 2px;
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.1),
+      0 2px 4px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  }
+
+  .footer-info span { color: var(--brass-light); }
+
+  /* Loading overlay */
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 32, 28, 0.92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(4px);
+  }
+
+  .loading-overlay.active { display: flex; }
+
+  .loading-content { text-align: center; font-family: var(--mono); }
+
+  .loading-spinner {
+    width: 44px;
+    height: 44px;
+    border: 3px solid var(--tin-cloth-edge);
+    border-top-color: var(--brass-light);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 18px;
+    box-shadow: 0 0 12px rgba(168, 132, 61, 0.3);
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-family: var(--serif);
+    font-size: 14px;
+    letter-spacing: 0.1em;
+    color: var(--cream);
+  }
+
+  .loading-detail {
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 8px;
+    letter-spacing: 0.08em;
+  }
+
+  /* Mode-specific cursors */
+  .mode-circle #map, .mode-rect #map { cursor: crosshair; }
+
+  /* Responsive */
+  @media (max-width: 880px) {
+    body {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+    }
+    .sidebar { max-height: 55vh; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="brand">EST. KLINEKRAFT // THE WALL MAP CO.</div>
+    <h1>Field Cartographer</h1>
+    <div class="subtitle">v1.2 — print-ready PDF works</div>
+  </div>
+
+  <!-- MAP STYLE -->
+  <div class="section">
+    <div class="section-label">Map Style</div>
+    <div class="style-row">
+      <button class="style-pill active" data-style="light-v11" data-raster="false">LIGHT</button>
+      <button class="style-pill" data-style="streets-v12" data-raster="false">STREETS</button>
+      <button class="style-pill" data-style="outdoors-v12" data-raster="false">OUTDOORS</button>
+      <button class="style-pill" data-style="satellite-v9" data-raster="true">SATELLITE</button>
+      <button class="style-pill" data-style="satellite-streets-v12" data-raster="true">SAT STREETS</button>
+    </div>
+    <div class="style-warning" id="style-warning">
+      Note: satellite imagery is raster-based and may appear soft on 16×20 prints of small areas. Vector styles stay crisp at any size.
+    </div>
+  </div>
+
+  <!-- LAYERS / FILTERS -->
+  <div class="section">
+    <div class="section-label">Layers</div>
+    <div class="layers-block">
+
+      <div>
+        <div class="toggle-row" style="padding-bottom: 4px;">
+          <label>LABEL DENSITY</label>
+        </div>
+        <div class="segmented" id="label-density">
+          <button class="active" data-density="all">ALL</button>
+          <button data-density="major">MAJOR</button>
+          <button data-density="none">NONE</button>
+        </div>
+      </div>
+
+      <div>
+        <div class="toggle-row" style="padding-bottom: 4px;">
+          <label>ROAD WEIGHT</label>
+        </div>
+        <div class="segmented" id="road-weight">
+          <button data-weight="subtle">SUBTLE</button>
+          <button class="active" data-weight="default">DEFAULT</button>
+          <button data-weight="bold">BOLD</button>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <label>HIDE POIs</label>
+        <div class="brass-switch" id="poi-toggle"></div>
+      </div>
+
+      <div>
+        <div class="toggle-row" style="padding-bottom: 4px;">
+          <label>HIGHLIGHT COLOR</label>
+        </div>
+        <div class="color-row" id="color-row">
+          <div class="color-swatch active" data-color="#a8843d" style="background: radial-gradient(circle at 30% 30%, #c89e4f, #a8843d);"></div>
+          <div class="color-swatch" data-color="#ff5b04" style="background: radial-gradient(circle at 30% 30%, #ff7a2e, #ff5b04);"></div>
+          <div class="color-swatch" data-color="#c8392c" style="background: radial-gradient(circle at 30% 30%, #d8584c, #c8392c);"></div>
+          <div class="color-swatch" data-color="#1a4d8a" style="background: radial-gradient(circle at 30% 30%, #3970b0, #1a4d8a);"></div>
+          <div class="color-swatch" data-color="#3a6b3c" style="background: radial-gradient(circle at 30% 30%, #5a8b5c, #3a6b3c);"></div>
+          <div class="color-swatch" data-color="#1a1f1a" style="background: radial-gradient(circle at 30% 30%, #4a544a, #1a1f1a);"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PAGE SIZE -->
+  <div class="section">
+    <div class="section-label">Page Size</div>
+    <div class="size-grid">
+      <button class="size-btn active" data-size="letter" data-w="8.5" data-h="11">
+        Letter
+        <span class="dim">8.5 × 11</span>
+      </button>
+      <button class="size-btn" data-size="tabloid" data-w="11" data-h="17">
+        Tabloid
+        <span class="dim">11 × 17</span>
+      </button>
+      <button class="size-btn" data-size="poster" data-w="16" data-h="20">
+        Poster
+        <span class="dim">16 × 20</span>
+      </button>
+    </div>
+
+    <div class="orient-row">
+      <button class="orient-btn active" data-orient="portrait">PORTRAIT</button>
+      <button class="orient-btn" data-orient="landscape">LANDSCAPE</button>
+    </div>
+  </div>
+
+  <!-- AREA SELECTION -->
+  <div class="section">
+    <div class="section-label">Area Selection</div>
+    <div class="tool-row">
+      <button class="tool-btn active" data-tool="none">NONE</button>
+      <button class="tool-btn" data-tool="circle">CIRCLE</button>
+      <button class="tool-btn" data-tool="rect">RECT</button>
+    </div>
+
+    <div id="circle-controls" style="display:none;">
+      <div class="radius-input-row">
+        <label>RADIUS</label>
+        <input type="number" class="radius-input" id="radius-input" value="3" min="0.1" step="0.1" />
+        <label>MI</label>
+      </div>
+      <div class="help-text">Click on the map to set the center, then drag to set the radius.</div>
+    </div>
+
+    <div id="rect-controls" style="display:none;">
+      <div class="help-text">Click and drag on the map to draw a rectangle.</div>
+    </div>
+
+    <div id="none-controls">
+      <div class="help-text">Pan and zoom freely. The brass frame shows what will print.</div>
+    </div>
+  </div>
+
+  <!-- INFO -->
+  <div class="section">
+    <div class="section-label">Map Info</div>
+    <div class="info-card">
+      <div class="info-row">
+        <span class="info-label">Center</span>
+        <span class="info-value" id="info-center">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Zoom</span>
+        <span class="info-value" id="info-zoom">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Scale</span>
+        <span class="info-value" id="info-scale">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Output</span>
+        <span class="info-value" id="info-output">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOWNLOAD -->
+  <div class="download-section">
+    <button class="download-btn" id="download-btn">
+      <span>GENERATE PDF</span>
+      <span class="arrow">↓</span>
+    </button>
+    <div class="download-status" id="download-status">READY</div>
+  </div>
+</aside>
+
+<main class="map-container" id="map-container">
+  <div id="map"></div>
+
+  <div class="page-overlay">
+    <div class="page-frame" id="page-frame">
+      <div class="page-corner tl"></div>
+      <div class="page-corner tr"></div>
+      <div class="page-corner bl"></div>
+      <div class="page-corner br"></div>
+      <div class="page-label" id="page-label">8.5 × 11 PORTRAIT</div>
+    </div>
+  </div>
+
+  <div class="footer-info">
+    <span>OK</span> // Tulsa metro default — pan & zoom anywhere in Oklahoma
+  </div>
+
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-text" id="loading-text">PRINTING TO PRESS</div>
+      <div class="loading-detail" id="loading-detail">Stitching tiles…</div>
+    </div>
+  </div>
+</main>
+
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  pageSize: 'letter',
+  pageW: 8.5,
+  pageH: 11,
+  orientation: 'portrait',
+  tool: 'none',
+  selection: null,
+  styleId: 'light-v11',
+  isRaster: false,
+  // Layer prefs
+  labelDensity: 'all',   // all | major | none
+  roadWeight: 'default', // subtle | default | bold
+  hidePOIs: false,
+  accentColor: '#a8843d',
+  map: null
+};
+
+// ============================================================
+// MAP BOOT
+// ============================================================
+async function bootMap() {
+  let token;
+  try {
+    const r = await fetch('/api/map-token');
+    if (!r.ok) throw new Error('Token fetch failed');
+    token = (await r.json()).token;
+  } catch (e) {
+    document.getElementById('loading-overlay').classList.add('active');
+    document.getElementById('loading-text').textContent = 'CONFIG ERROR';
+    document.getElementById('loading-detail').textContent = 'Could not load Mapbox token. Check Vercel env vars.';
+    return;
+  }
+
+  mapboxgl.accessToken = token;
+
+  state.map = new mapboxgl.Map({
+    container: 'map',
+    style: `mapbox://styles/mapbox/${state.styleId}`,
+    center: [-95.9928, 36.1540],
+    zoom: 9,
+    attributionControl: { compact: true }
+  });
+
+  state.map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+  state.map.on('load', () => {
+    initSelectionLayers();
+    initSelectionHandlers();
+    applyAllLayerPrefs();
+    updateInfo();
+    updatePageFrame();
+  });
+
+  state.map.on('style.load', () => {
+    if (state.map.isStyleLoaded()) {
+      initSelectionLayers();
+      applyAllLayerPrefs();
+      // Restore selection
+      if (state.selection) {
+        if (state.selection.type === 'circle') {
+          setCircleSelection(state.selection.center, state.selection.radiusMi);
+        } else if (state.selection.type === 'rect') {
+          setRectSelection(state.selection.sw, state.selection.ne);
+        }
+      }
+    }
+  });
+
+  state.map.on('move', updateInfo);
+  state.map.on('zoom', updateInfo);
+  state.map.on('resize', updatePageFrame);
+}
+
+// ============================================================
+// LAYER PREFS — applied to live map after every style.load
+// ============================================================
+// Pattern matchers for layer IDs across Mapbox styles
+const LAYER_PATTERNS = {
+  // POIs — restaurants, shops, etc.
+  poi: /^poi-/i,
+
+  // Place labels at different scales
+  placeMajor: /^(country|state|continent)-label/i,    // top tier — always shown unless 'none'
+  placeMid:   /^(settlement-major|place-city|settlement-subdivision)-label/i,
+  placeMinor: /^(settlement-minor|place-town|place-village|settlement|place-suburb|place-neighbourhood|place-hamlet|place-island)-label/i,
+
+  // Road layers — for weight adjustment
+  road: /^(road|tunnel|bridge)/i,
+
+  // Road labels — kept separate from POI/place
+  roadLabel: /-label$/i,
+};
+
+function eachLayerMatching(rxs, fn) {
+  if (!state.map || !state.map.getStyle()) return;
+  const layers = state.map.getStyle().layers || [];
+  for (const layer of layers) {
+    for (const rx of rxs) {
+      if (rx.test(layer.id)) {
+        fn(layer);
+        break;
+      }
+    }
+  }
+}
+
+function applyAllLayerPrefs() {
+  applyLabelDensity();
+  applyRoadWeight();
+  applyPOIToggle();
+}
+
+function applyLabelDensity() {
+  const d = state.labelDensity;
+  // Show all
+  if (d === 'all') {
+    eachLayerMatching([LAYER_PATTERNS.placeMajor, LAYER_PATTERNS.placeMid, LAYER_PATTERNS.placeMinor], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'visible'); } catch {}
+    });
+  } else if (d === 'major') {
+    eachLayerMatching([LAYER_PATTERNS.placeMajor, LAYER_PATTERNS.placeMid], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'visible'); } catch {}
+    });
+    eachLayerMatching([LAYER_PATTERNS.placeMinor], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'none'); } catch {}
+    });
+  } else if (d === 'none') {
+    eachLayerMatching([LAYER_PATTERNS.placeMajor, LAYER_PATTERNS.placeMid, LAYER_PATTERNS.placeMinor], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'none'); } catch {}
+    });
+  }
+}
+
+function applyRoadWeight() {
+  const factor = state.roadWeight === 'bold' ? 1.6 :
+                 state.roadWeight === 'subtle' ? 0.55 : 1.0;
+  eachLayerMatching([LAYER_PATTERNS.road], (l) => {
+    if (l.type !== 'line') return;
+    if (LAYER_PATTERNS.roadLabel.test(l.id)) return; // skip road *labels*
+    try {
+      const cur = state.map.getPaintProperty(l.id, 'line-width');
+      // Save the original once, so toggling between weights stays consistent
+      if (cur && !l.__originalWidth) l.__originalWidth = cur;
+      const orig = l.__originalWidth || cur;
+      const scaled = scaleLineWidthExpr(orig, factor);
+      if (scaled != null) state.map.setPaintProperty(l.id, 'line-width', scaled);
+    } catch {}
+  });
+}
+
+// Multiply a Mapbox line-width expression or numeric value by a factor.
+// Mapbox line-width can be a number, an interpolate expression, or a step expression.
+function scaleLineWidthExpr(expr, factor) {
+  if (factor === 1.0) return expr;
+  if (typeof expr === 'number') return expr * factor;
+  if (Array.isArray(expr)) {
+    // Recursively scale numeric leaves; cheap and works for most stops.
+    return expr.map(v => typeof v === 'number' ? v * factor : (Array.isArray(v) ? scaleLineWidthExpr(v, factor) : v));
+  }
+  if (expr && typeof expr === 'object' && Array.isArray(expr.stops)) {
+    return { ...expr, stops: expr.stops.map(([z, v]) => [z, typeof v === 'number' ? v * factor : v]) };
+  }
+  return expr;
+}
+
+function applyPOIToggle() {
+  eachLayerMatching([LAYER_PATTERNS.poi], (l) => {
+    try {
+      state.map.setLayoutProperty(l.id, 'visibility', state.hidePOIs ? 'none' : 'visible');
+    } catch {}
+  });
+}
+
+// ============================================================
+// SELECTION LAYERS
+// ============================================================
+function initSelectionLayers() {
+  if (state.map.getSource('selection-fill')) return;
+
+  state.map.addSource('selection-fill', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] }
+  });
+  state.map.addSource('selection-line', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] }
+  });
+
+  state.map.addLayer({
+    id: 'selection-fill-layer',
+    type: 'fill',
+    source: 'selection-fill',
+    paint: { 'fill-color': state.accentColor, 'fill-opacity': 0.10 }
+  });
+  state.map.addLayer({
+    id: 'selection-line-layer',
+    type: 'line',
+    source: 'selection-line',
+    paint: {
+      'line-color': state.accentColor,
+      'line-width': 2,
+      'line-dasharray': [2, 2]
+    }
+  });
+}
+
+function refreshSelectionLayerColor() {
+  if (!state.map) return;
+  if (state.map.getLayer('selection-fill-layer')) {
+    state.map.setPaintProperty('selection-fill-layer', 'fill-color', state.accentColor);
+  }
+  if (state.map.getLayer('selection-line-layer')) {
+    state.map.setPaintProperty('selection-line-layer', 'line-color', state.accentColor);
+  }
+}
+
+function clearSelection() {
+  state.selection = null;
+  if (state.map.getSource('selection-fill')) {
+    state.map.getSource('selection-fill').setData({ type: 'FeatureCollection', features: [] });
+    state.map.getSource('selection-line').setData({ type: 'FeatureCollection', features: [] });
+  }
+}
+
+function setCircleSelection(center, radiusMi) {
+  state.selection = { type: 'circle', center, radiusMi };
+  if (!state.map.getSource('selection-fill')) return;
+  const poly = circleToPolygon(center, radiusMi);
+  state.map.getSource('selection-fill').setData({
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', geometry: poly }]
+  });
+  state.map.getSource('selection-line').setData({
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: poly.coordinates[0] } }]
+  });
+}
+
+function setRectSelection(sw, ne) {
+  state.selection = { type: 'rect', sw, ne };
+  if (!state.map.getSource('selection-fill')) return;
+  const ring = [
+    [sw[0], sw[1]], [ne[0], sw[1]], [ne[0], ne[1]], [sw[0], ne[1]], [sw[0], sw[1]]
+  ];
+  state.map.getSource('selection-fill').setData({
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] } }]
+  });
+  state.map.getSource('selection-line').setData({
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: ring } }]
+  });
+}
+
+function circleToPolygon(center, radiusMi, steps = 64) {
+  const [lng, lat] = center;
+  const radiusKm = radiusMi * 1.609344;
+  const earthR = 6371;
+  const angDist = radiusKm / earthR;
+  const latRad = lat * Math.PI / 180;
+  const lngRad = lng * Math.PI / 180;
+  const coords = [];
+  for (let i = 0; i <= steps; i++) {
+    const brg = (i / steps) * 2 * Math.PI;
+    const newLat = Math.asin(Math.sin(latRad) * Math.cos(angDist) + Math.cos(latRad) * Math.sin(angDist) * Math.cos(brg));
+    const newLng = lngRad + Math.atan2(
+      Math.sin(brg) * Math.sin(angDist) * Math.cos(latRad),
+      Math.cos(angDist) - Math.sin(latRad) * Math.sin(newLat)
+    );
+    coords.push([newLng * 180 / Math.PI, newLat * 180 / Math.PI]);
+  }
+  return { type: 'Polygon', coordinates: [coords] };
+}
+
+// ============================================================
+// SELECTION HANDLERS
+// ============================================================
+function initSelectionHandlers() {
+  let dragging = false;
+  let startLngLat = null;
+
+  state.map.on('mousedown', (e) => {
+    if (state.tool === 'none') return;
+    e.preventDefault();
+    state.map.dragPan.disable();
+    dragging = true;
+    startLngLat = [e.lngLat.lng, e.lngLat.lat];
+
+    if (state.tool === 'circle') {
+      setCircleSelection(startLngLat, parseFloat(document.getElementById('radius-input').value) || 1);
+    }
+  });
+
+  state.map.on('mousemove', (e) => {
+    if (!dragging || state.tool === 'none') return;
+    const cur = [e.lngLat.lng, e.lngLat.lat];
+
+    if (state.tool === 'circle') {
+      const dist = haversineMi(startLngLat, cur);
+      document.getElementById('radius-input').value = dist.toFixed(2);
+      setCircleSelection(startLngLat, dist);
+    } else if (state.tool === 'rect') {
+      const sw = [Math.min(startLngLat[0], cur[0]), Math.min(startLngLat[1], cur[1])];
+      const ne = [Math.max(startLngLat[0], cur[0]), Math.max(startLngLat[1], cur[1])];
+      setRectSelection(sw, ne);
+    }
+  });
+
+  state.map.on('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    state.map.dragPan.enable();
+    fitToSelection();
+  });
+
+  document.getElementById('radius-input').addEventListener('input', (e) => {
+    if (state.selection?.type === 'circle') {
+      const r = parseFloat(e.target.value) || 0.1;
+      setCircleSelection(state.selection.center, r);
+      fitToSelection();
+    }
+  });
+}
+
+function haversineMi(a, b) {
+  const R = 3958.756;
+  const dLat = (b[1] - a[1]) * Math.PI / 180;
+  const dLng = (b[0] - a[0]) * Math.PI / 180;
+  const lat1 = a[1] * Math.PI / 180;
+  const lat2 = b[1] * Math.PI / 180;
+  const x = Math.sin(dLat/2) ** 2 + Math.sin(dLng/2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+
+function fitToSelection() {
+  if (!state.selection) return;
+  let bounds;
+  if (state.selection.type === 'circle') {
+    const poly = circleToPolygon(state.selection.center, state.selection.radiusMi);
+    bounds = new mapboxgl.LngLatBounds();
+    poly.coordinates[0].forEach(c => bounds.extend(c));
+  } else {
+    bounds = new mapboxgl.LngLatBounds(state.selection.sw, state.selection.ne);
+  }
+  state.map.fitBounds(bounds, { padding: 40, duration: 600 });
+}
+
+// ============================================================
+// PAGE FRAME
+// ============================================================
+function currentPageDims() {
+  let w = state.pageW, h = state.pageH;
+  if (state.orientation === 'landscape') [w, h] = [h, w];
+  return { w, h };
+}
+
+function currentPageAspect() {
+  const { w, h } = currentPageDims();
+  return w / h;
+}
+
+function updatePageFrame() {
+  const container = document.getElementById('map-container');
+  const cw = container.clientWidth;
+  const ch = container.clientHeight;
+  const pageAspect = currentPageAspect();
+  const containerAspect = cw / ch;
+
+  const pad = 60;
+  let frameW, frameH;
+  if (containerAspect > pageAspect) {
+    frameH = ch - pad * 2;
+    frameW = frameH * pageAspect;
+  } else {
+    frameW = cw - pad * 2;
+    frameH = frameW / pageAspect;
+  }
+
+  const frame = document.getElementById('page-frame');
+  frame.style.width = `${frameW}px`;
+  frame.style.height = `${frameH}px`;
+  frame.style.left = `${(cw - frameW) / 2}px`;
+  frame.style.top = `${(ch - frameH) / 2}px`;
+
+  const { w, h } = currentPageDims();
+  document.getElementById('page-label').textContent =
+    `${w} × ${h} ${state.orientation.toUpperCase()}`;
+
+  updateInfo();
+  updateStyleWarning();
+}
+
+// ============================================================
+// INFO PANEL
+// ============================================================
+function updateInfo() {
+  if (!state.map) return;
+  const c = state.map.getCenter();
+  document.getElementById('info-center').textContent =
+    `${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`;
+  document.getElementById('info-zoom').textContent = state.map.getZoom().toFixed(2);
+
+  const z = state.map.getZoom();
+  const lat = c.lat;
+  const metersPerPx = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z);
+  const inchesPerPx = metersPerPx * 39.3701;
+  const scaleRatio = inchesPerPx * 96;
+  document.getElementById('info-scale').textContent = `1:${Math.round(scaleRatio).toLocaleString()}`;
+
+  const { w, h } = currentPageDims();
+  document.getElementById('info-output').textContent = `${w}×${h} @ 300dpi`;
+}
+
+function updateStyleWarning() {
+  const warn = document.getElementById('style-warning');
+  if (state.isRaster && state.pageSize === 'poster') warn.classList.add('visible');
+  else warn.classList.remove('visible');
+}
+
+// ============================================================
+// CONTROLS WIRING
+// ============================================================
+document.querySelectorAll('.style-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.style-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.styleId = btn.dataset.style;
+    state.isRaster = btn.dataset.raster === 'true';
+    state.map.setStyle(`mapbox://styles/mapbox/${state.styleId}`);
+    updateStyleWarning();
+  });
+});
+
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.pageSize = btn.dataset.size;
+    state.pageW = parseFloat(btn.dataset.w);
+    state.pageH = parseFloat(btn.dataset.h);
+    updatePageFrame();
+  });
+});
+
+document.querySelectorAll('.orient-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.orient-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.orientation = btn.dataset.orient;
+    updatePageFrame();
+  });
+});
+
+document.querySelectorAll('.tool-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.tool = btn.dataset.tool;
+
+    document.getElementById('circle-controls').style.display = state.tool === 'circle' ? 'block' : 'none';
+    document.getElementById('rect-controls').style.display = state.tool === 'rect' ? 'block' : 'none';
+    document.getElementById('none-controls').style.display = state.tool === 'none' ? 'block' : 'none';
+
+    document.body.classList.toggle('mode-circle', state.tool === 'circle');
+    document.body.classList.toggle('mode-rect', state.tool === 'rect');
+
+    if (state.tool === 'none') clearSelection();
+  });
+});
+
+// Label density
+document.querySelectorAll('#label-density button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#label-density button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.labelDensity = btn.dataset.density;
+    applyLabelDensity();
+  });
+});
+
+// Road weight
+document.querySelectorAll('#road-weight button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#road-weight button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.roadWeight = btn.dataset.weight;
+    applyRoadWeight();
+  });
+});
+
+// POI toggle
+document.getElementById('poi-toggle').addEventListener('click', (e) => {
+  state.hidePOIs = !state.hidePOIs;
+  e.currentTarget.classList.toggle('on', state.hidePOIs);
+  applyPOIToggle();
+});
+
+// Color picker
+document.querySelectorAll('.color-swatch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    sw.classList.add('active');
+    state.accentColor = sw.dataset.color;
+    refreshSelectionLayerColor();
+  });
+});
+
+// ============================================================
+// PDF GENERATION
+// ============================================================
+document.getElementById('download-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('download-btn');
+  const status = document.getElementById('download-status');
+  const overlay = document.getElementById('loading-overlay');
+  const loadingDetail = document.getElementById('loading-detail');
+
+  btn.disabled = true;
+  overlay.classList.add('active');
+  status.className = 'download-status';
+  status.textContent = 'GENERATING…';
+
+  const frame = document.getElementById('page-frame');
+  const rect = frame.getBoundingClientRect();
+  const mapRect = document.getElementById('map').getBoundingClientRect();
+  const tl = state.map.unproject([rect.left - mapRect.left, rect.top - mapRect.top]);
+  const br = state.map.unproject([rect.right - mapRect.left, rect.bottom - mapRect.top]);
+
+  const { w, h } = currentPageDims();
+
+  const payload = {
+    bounds: {
+      west: Math.min(tl.lng, br.lng),
+      east: Math.max(tl.lng, br.lng),
+      north: Math.max(tl.lat, br.lat),
+      south: Math.min(tl.lat, br.lat)
+    },
+    pageWidthIn: w,
+    pageHeightIn: h,
+    selection: state.selection,
+    styleId: state.styleId,
+    accentColor: state.accentColor
+  };
+
+  try {
+    loadingDetail.textContent = 'Requesting tiles…';
+    const res = await fetch('/api/generate-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err || `HTTP ${res.status}`);
+    }
+
+    loadingDetail.textContent = 'Building PDF…';
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const styleName = state.styleId.replace(/-v\d+$/, '');
+    a.download = `wall-map-${styleName}-${w}x${h}-${Date.now()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    status.className = 'download-status success';
+    status.textContent = 'DOWNLOADED';
+  } catch (e) {
+    console.error(e);
+    status.className = 'download-status error';
+    status.textContent = 'ERROR — ' + (e.message || 'unknown');
+  } finally {
+    btn.disabled = false;
+    overlay.classList.remove('active');
+    setTimeout(() => {
+      if (status.textContent === 'DOWNLOADED') {
+        status.className = 'download-status';
+        status.textContent = 'READY';
+      }
+    }, 3500);
+  }
+});
+
+window.addEventListener('resize', updatePageFrame);
+bootMap();
+</script>
+</body>
+</html>
