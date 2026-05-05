@@ -1,0 +1,1751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>maps // klinekraft</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     SAGE NEUMORPHISM — DARK + LIGHT THEMES
+     ============================================================ */
+  :root[data-theme="dark"] {
+    --bg:           #1a201c;
+    --bg-deep:      #141813;
+    --surface:      #1f2620;
+    --surface-2:    #232b25;
+    --surface-3:    #28312b;
+
+    --shadow-dark:  rgba(0, 0, 0, 0.55);
+    --shadow-light: rgba(255, 255, 255, 0.025);
+
+    --text:         #e2e8e0;
+    --text-dim:     #9ca89e;
+    --text-faint:   #6b766c;
+
+    --accent:       #6b8a5f;
+    --accent-soft:  #7a9c6e;
+    --accent-deep:  #4f6845;
+    --accent-glow:  rgba(107, 138, 95, 0.35);
+
+    --danger:       #c47878;
+    --success:      #7fb583;
+  }
+
+  :root[data-theme="light"] {
+    --bg:           #ecf0e8;
+    --bg-deep:      #e0e6dc;
+    --surface:      #eef2ea;
+    --surface-2:    #e8ede4;
+    --surface-3:    #e2e8de;
+
+    --shadow-dark:  rgba(89, 105, 80, 0.18);
+    --shadow-light: rgba(255, 255, 255, 0.95);
+
+    --text:         #2a342a;
+    --text-dim:     #5a6a58;
+    --text-faint:   #8a9888;
+
+    --accent:       #6b8a5f;
+    --accent-soft:  #7a9c6e;
+    --accent-deep:  #4f6845;
+    --accent-glow:  rgba(107, 138, 95, 0.25);
+
+    --danger:       #b85a5a;
+    --success:      #5e8a62;
+  }
+
+  /* ============================================================
+     RESET + BASE
+     ============================================================ */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    -webkit-font-smoothing: antialiased;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+
+  body {
+    display: grid;
+    grid-template-columns: 360px 1fr;
+    grid-template-rows: 100vh;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: var(--surface-3);
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent-deep); }
+
+  /* ============================================================
+     SIDEBAR
+     ============================================================ */
+  .sidebar {
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     HEADER
+     ============================================================ */
+  .sidebar-header {
+    padding: 28px 28px 22px;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .header-text { flex: 1; min-width: 0; }
+
+  .brand-line {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+
+  .sidebar-header h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text);
+    line-height: 1.15;
+  }
+
+  .sidebar-header .subtitle {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 6px;
+    font-weight: 400;
+    letter-spacing: 0;
+  }
+
+  /* Theme toggle — small neumorphic round button */
+  .theme-toggle {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 50%;
+    background: var(--bg);
+    color: var(--text-dim);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    box-shadow:
+      4px 4px 8px var(--shadow-dark),
+      -4px -4px 8px var(--shadow-light);
+    transition: all 0.2s ease;
+  }
+
+  .theme-toggle:hover { color: var(--accent); }
+
+  .theme-toggle:active {
+    box-shadow:
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
+  }
+
+  .theme-toggle svg { width: 18px; height: 18px; }
+
+  /* ============================================================
+     SECTIONS
+     ============================================================ */
+  .section { padding: 16px 28px; }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, var(--surface-3), transparent);
+    opacity: 0.6;
+  }
+
+  /* ============================================================
+     NEUMORPHIC PRIMITIVES
+     ============================================================ */
+  .neu-raised {
+    background: var(--bg);
+    border-radius: 12px;
+    box-shadow:
+      6px 6px 12px var(--shadow-dark),
+      -6px -6px 12px var(--shadow-light);
+  }
+
+  .neu-inset {
+    background: var(--bg);
+    border-radius: 12px;
+    box-shadow:
+      inset 4px 4px 8px var(--shadow-dark),
+      inset -4px -4px 8px var(--shadow-light);
+  }
+
+  /* ============================================================
+     PILLS / BUTTONS — generic neumorphic style
+     ============================================================ */
+  .pill-row, .seg-row, .grid-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .seg-row { gap: 6px; }
+
+  .grid-row {
+    display: grid;
+    gap: 6px;
+  }
+  .grid-row.cols-2 { grid-template-columns: 1fr 1fr; }
+  .grid-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+  .neu-btn {
+    background: var(--bg);
+    border: none;
+    color: var(--text-dim);
+    padding: 10px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    transition: all 0.18s ease;
+    border-radius: 10px;
+    white-space: nowrap;
+    box-shadow:
+      4px 4px 8px var(--shadow-dark),
+      -4px -4px 8px var(--shadow-light);
+  }
+
+  .neu-btn:hover { color: var(--text); }
+
+  .neu-btn:active {
+    box-shadow:
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
+  }
+
+  .neu-btn.active {
+    color: var(--accent);
+    font-weight: 600;
+    box-shadow:
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
+  }
+
+  .neu-btn.size-btn { padding: 12px 8px; text-align: center; line-height: 1.3; }
+
+  .neu-btn .dim {
+    display: block;
+    font-size: 9px;
+    font-weight: 400;
+    letter-spacing: 0.05em;
+    color: var(--text-faint);
+    margin-top: 3px;
+  }
+
+  .neu-btn.active .dim { color: var(--accent); opacity: 0.8; }
+
+  /* Style pills — radius variation */
+  .style-pill {
+    border-radius: 999px;
+    padding: 8px 14px;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* ============================================================
+     SEGMENTED CONTROL — single neu-inset container with pills inside
+     ============================================================ */
+  .segmented {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 4px;
+    padding: 5px;
+    background: var(--bg);
+    border-radius: 12px;
+    box-shadow:
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
+  }
+
+  .segmented.cols-2 { grid-template-columns: 1fr 1fr; }
+
+  .segmented button {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    padding: 8px 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    transition: all 0.18s ease;
+    border-radius: 8px;
+  }
+
+  .segmented button:hover { color: var(--text); }
+
+  .segmented button.active {
+    background: var(--bg);
+    color: var(--accent);
+    font-weight: 600;
+    box-shadow:
+      3px 3px 6px var(--shadow-dark),
+      -3px -3px 6px var(--shadow-light);
+  }
+
+  /* ============================================================
+     SLIDER
+     ============================================================ */
+  .slider-row {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .slider-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .slider-meta .v {
+    color: var(--accent);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  input[type="range"].neu-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 32px;
+    background: transparent;
+    outline: none;
+    margin: 0;
+  }
+
+  input[type="range"].neu-slider::-webkit-slider-runnable-track {
+    height: 8px;
+    background: var(--bg);
+    border-radius: 4px;
+    box-shadow:
+      inset 2px 2px 4px var(--shadow-dark),
+      inset -2px -2px 4px var(--shadow-light);
+  }
+
+  input[type="range"].neu-slider::-moz-range-track {
+    height: 8px;
+    background: var(--bg);
+    border-radius: 4px;
+    box-shadow:
+      inset 2px 2px 4px var(--shadow-dark),
+      inset -2px -2px 4px var(--shadow-light);
+  }
+
+  input[type="range"].neu-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 22px;
+    height: 22px;
+    margin-top: -7px;
+    background: var(--bg);
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow:
+      3px 3px 6px var(--shadow-dark),
+      -3px -3px 6px var(--shadow-light);
+  }
+
+  input[type="range"].neu-slider::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    background: var(--bg);
+    border: 2px solid var(--accent);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow:
+      3px 3px 6px var(--shadow-dark),
+      -3px -3px 6px var(--shadow-light);
+  }
+
+  /* ============================================================
+     TOGGLE SWITCH
+     ============================================================ */
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 2px;
+  }
+
+  .toggle-row label {
+    font-size: 12px;
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .neu-switch {
+    position: relative;
+    width: 46px;
+    height: 26px;
+    cursor: pointer;
+    background: var(--bg);
+    border-radius: 13px;
+    box-shadow:
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
+    transition: all 0.2s ease;
+  }
+
+  .neu-switch::after {
+    content: '';
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--bg);
+    box-shadow:
+      2px 2px 4px var(--shadow-dark),
+      -2px -2px 4px var(--shadow-light);
+    transition: all 0.2s ease;
+  }
+
+  .neu-switch.on::after {
+    transform: translateX(20px);
+    background: var(--accent);
+    box-shadow:
+      2px 2px 6px var(--accent-glow),
+      -1px -1px 3px var(--shadow-light);
+  }
+
+  /* ============================================================
+     COLOR SWATCHES
+     ============================================================ */
+  .color-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .color-swatch {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    background: var(--bg);
+    padding: 4px;
+    box-shadow:
+      3px 3px 6px var(--shadow-dark),
+      -3px -3px 6px var(--shadow-light);
+    transition: all 0.15s ease;
+    position: relative;
+  }
+
+  .color-swatch::after {
+    content: '';
+    display: block;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: var(--swatch-color);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .color-swatch:hover {
+    transform: scale(1.06);
+  }
+
+  .color-swatch.active {
+    box-shadow:
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
+  }
+
+  /* ============================================================
+     STYLE WARNING
+     ============================================================ */
+  .style-warning {
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: var(--bg);
+    box-shadow:
+      inset 2px 2px 4px var(--shadow-dark),
+      inset -2px -2px 4px var(--shadow-light);
+    color: var(--text-dim);
+    font-size: 11px;
+    line-height: 1.5;
+    display: none;
+  }
+
+  .style-warning.visible { display: block; }
+
+  /* ============================================================
+     SELECTION CONTROLS
+     ============================================================ */
+  .radius-input-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .radius-input {
+    flex: 1;
+    background: var(--bg);
+    border: none;
+    color: var(--text);
+    padding: 10px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    outline: none;
+    border-radius: 10px;
+    box-shadow:
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
+  }
+
+  .radius-input-row label {
+    font-size: 10px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+
+  .help-text {
+    font-size: 11px;
+    color: var(--text-faint);
+    margin-top: 12px;
+    line-height: 1.55;
+  }
+
+  /* ============================================================
+     INFO CARD
+     ============================================================ */
+  .info-card {
+    padding: 16px 18px;
+    background: var(--bg);
+    border-radius: 12px;
+    box-shadow:
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .info-card .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 5px 0;
+    border-bottom: 1px solid var(--surface-3);
+  }
+
+  .info-card .info-row:last-child { border-bottom: none; }
+
+  .info-card .info-label {
+    color: var(--text-faint);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .info-card .info-value {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  /* ============================================================
+     DOWNLOAD
+     ============================================================ */
+  .download-section {
+    padding: 22px 28px 28px;
+    margin-top: auto;
+  }
+
+  .download-btn {
+    width: 100%;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 16px 20px;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-radius: 12px;
+    box-shadow:
+      5px 5px 10px var(--shadow-dark),
+      -5px -5px 10px var(--shadow-light),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  }
+
+  .download-btn:hover:not(:disabled) {
+    background: var(--accent-soft);
+    transform: translateY(-1px);
+    box-shadow:
+      6px 6px 14px var(--shadow-dark),
+      -6px -6px 14px var(--shadow-light),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+  }
+
+  .download-btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow:
+      inset 4px 4px 8px rgba(0, 0, 0, 0.3),
+      inset -4px -4px 8px rgba(255, 255, 255, 0.05);
+  }
+
+  .download-btn:disabled {
+    background: var(--surface-3);
+    color: var(--text-faint);
+    cursor: not-allowed;
+    box-shadow:
+      inset 3px 3px 6px var(--shadow-dark),
+      inset -3px -3px 6px var(--shadow-light);
+  }
+
+  .download-btn .arrow {
+    font-size: 16px;
+    font-weight: 400;
+  }
+
+  .download-status {
+    font-size: 10px;
+    color: var(--text-faint);
+    margin-top: 12px;
+    text-align: center;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    font-weight: 500;
+    min-height: 14px;
+  }
+
+  .download-status.error { color: var(--danger); }
+  .download-status.success { color: var(--success); }
+
+  /* ============================================================
+     MAP AREA
+     ============================================================ */
+  .map-container {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-deep);
+  }
+
+  #map { position: absolute; inset: 0; }
+
+  .page-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .page-frame {
+    position: absolute;
+    border: 2px solid var(--accent);
+    box-shadow:
+      0 0 0 9999px rgba(20, 26, 22, 0.55),
+      0 0 24px var(--accent-glow);
+    pointer-events: none;
+    transition: width 0.3s ease, height 0.3s ease;
+  }
+
+  :root[data-theme="light"] .page-frame {
+    box-shadow:
+      0 0 0 9999px rgba(236, 240, 232, 0.65),
+      0 0 24px var(--accent-glow);
+  }
+
+  .page-corner {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-color: var(--accent);
+    border-style: solid;
+  }
+
+  .page-corner.tl { top: -2px; left: -2px; border-width: 2px 0 0 2px; }
+  .page-corner.tr { top: -2px; right: -2px; border-width: 2px 2px 0 0; }
+  .page-corner.bl { bottom: -2px; left: -2px; border-width: 0 0 2px 2px; }
+  .page-corner.br { bottom: -2px; right: -2px; border-width: 0 2px 2px 0; }
+
+  .page-label {
+    position: absolute;
+    top: -32px;
+    left: 0;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: var(--bg);
+    padding: 6px 12px;
+    border-radius: 8px;
+    box-shadow:
+      3px 3px 6px var(--shadow-dark),
+      -3px -3px 6px var(--shadow-light);
+  }
+
+  /* Mapbox controls */
+  .mapboxgl-ctrl-group {
+    background: var(--bg) !important;
+    border: none !important;
+    border-radius: 10px !important;
+    overflow: hidden;
+    box-shadow:
+      4px 4px 8px var(--shadow-dark),
+      -4px -4px 8px var(--shadow-light) !important;
+  }
+
+  .mapboxgl-ctrl-group button {
+    background-color: transparent !important;
+    border: none !important;
+  }
+
+  .mapboxgl-ctrl-group button + button {
+    border-top: 1px solid var(--surface-3) !important;
+  }
+
+  :root[data-theme="dark"] .mapboxgl-ctrl-group button .mapboxgl-ctrl-icon {
+    filter: invert(0.85);
+  }
+
+  .mapboxgl-ctrl-attrib {
+    background: var(--bg) !important;
+    color: var(--text-dim) !important;
+    border-radius: 6px !important;
+  }
+
+  .mapboxgl-ctrl-attrib a { color: var(--accent) !important; }
+
+  .footer-info {
+    position: absolute;
+    bottom: 14px;
+    left: 14px;
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--bg);
+    padding: 8px 14px;
+    z-index: 5;
+    letter-spacing: 0.04em;
+    border-radius: 10px;
+    box-shadow:
+      4px 4px 8px var(--shadow-dark),
+      -4px -4px 8px var(--shadow-light);
+  }
+
+  .footer-info span { color: var(--accent); font-weight: 600; }
+
+  /* Loading */
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(20, 26, 22, 0.92);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    backdrop-filter: blur(6px);
+  }
+
+  :root[data-theme="light"] .loading-overlay {
+    background: rgba(236, 240, 232, 0.92);
+  }
+
+  .loading-overlay.active { display: flex; }
+
+  .loading-content { text-align: center; }
+
+  .loading-spinner {
+    width: 44px;
+    height: 44px;
+    border: 3px solid var(--surface-3);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 18px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+
+  .loading-detail {
+    font-size: 10px;
+    color: var(--text-dim);
+    margin-top: 8px;
+    letter-spacing: 0.05em;
+  }
+
+  /* Mode cursors */
+  .mode-circle #map, .mode-rect #map { cursor: crosshair; }
+
+  /* Responsive */
+  @media (max-width: 880px) {
+    body {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr;
+    }
+    .sidebar { max-height: 55vh; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="header-text">
+      <div class="brand-line">klinekraft // carto</div>
+      <h1>Wall Map Generator</h1>
+      <div class="subtitle">v1.3 · 300 DPI print-ready</div>
+    </div>
+    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle theme">
+      <svg id="theme-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <!-- moon by default; swapped to sun in light mode -->
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+      </svg>
+    </button>
+  </div>
+
+  <!-- MAP STYLE -->
+  <div class="section">
+    <div class="section-label">Map Style</div>
+    <div class="pill-row" id="style-row">
+      <button class="neu-btn style-pill active" data-style="light-v11" data-raster="false">Light</button>
+      <button class="neu-btn style-pill" data-style="streets-v12" data-raster="false">Streets</button>
+      <button class="neu-btn style-pill" data-style="outdoors-v12" data-raster="false">Outdoors</button>
+      <button class="neu-btn style-pill" data-style="satellite-v9" data-raster="true">Satellite</button>
+      <button class="neu-btn style-pill" data-style="satellite-streets-v12" data-raster="true">Sat Streets</button>
+    </div>
+    <div class="style-warning" id="style-warning">
+      Satellite imagery is raster — may appear soft on a 16×20 print of a small area. Vector styles stay crisp at any size.
+    </div>
+  </div>
+
+  <!-- LABELS -->
+  <div class="section">
+    <div class="section-label">Labels</div>
+
+    <div style="margin-bottom: 16px;">
+      <div class="slider-meta" style="margin-bottom: 6px;">
+        <span style="font-size: 11px; font-weight: 500;">Density</span>
+      </div>
+      <div class="segmented" id="label-density">
+        <button class="active" data-density="all">All</button>
+        <button data-density="major">Major</button>
+        <button data-density="none">None</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 16px;">
+      <div class="slider-meta">
+        <span style="font-size: 11px; font-weight: 500;">Size</span>
+        <span class="v" id="label-size-val">1.0×</span>
+      </div>
+      <input type="range" class="neu-slider" id="label-size" min="0.7" max="1.6" step="0.05" value="1.0" />
+    </div>
+
+    <div class="toggle-row">
+      <label>Bold labels</label>
+      <div class="neu-switch" id="label-bold-toggle"></div>
+    </div>
+  </div>
+
+  <!-- ROADS / LAYERS -->
+  <div class="section">
+    <div class="section-label">Layers</div>
+
+    <div style="margin-bottom: 16px;">
+      <div class="slider-meta" style="margin-bottom: 6px;">
+        <span style="font-size: 11px; font-weight: 500;">Road weight</span>
+      </div>
+      <div class="segmented" id="road-weight">
+        <button data-weight="subtle">Subtle</button>
+        <button class="active" data-weight="default">Default</button>
+        <button data-weight="bold">Bold</button>
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <label>Hide POIs</label>
+      <div class="neu-switch" id="poi-toggle"></div>
+    </div>
+  </div>
+
+  <!-- HIGHLIGHT COLOR -->
+  <div class="section">
+    <div class="section-label">Highlight Color</div>
+    <div class="color-row" id="color-row">
+      <div class="color-swatch active" data-color="#6b8a5f" style="--swatch-color: #6b8a5f;"></div>
+      <div class="color-swatch" data-color="#ff5b04" style="--swatch-color: #ff5b04;"></div>
+      <div class="color-swatch" data-color="#c8392c" style="--swatch-color: #c8392c;"></div>
+      <div class="color-swatch" data-color="#1a4d8a" style="--swatch-color: #1a4d8a;"></div>
+      <div class="color-swatch" data-color="#a8843d" style="--swatch-color: #a8843d;"></div>
+      <div class="color-swatch" data-color="#1a1f1a" style="--swatch-color: #1a1f1a;"></div>
+    </div>
+  </div>
+
+  <!-- PAGE SIZE -->
+  <div class="section">
+    <div class="section-label">Page Size</div>
+    <div class="grid-row cols-3" style="margin-bottom: 10px;">
+      <button class="neu-btn size-btn active" data-size="letter" data-w="8.5" data-h="11">
+        Letter
+        <span class="dim">8.5 × 11</span>
+      </button>
+      <button class="neu-btn size-btn" data-size="tabloid" data-w="11" data-h="17">
+        Tabloid
+        <span class="dim">11 × 17</span>
+      </button>
+      <button class="neu-btn size-btn" data-size="poster" data-w="16" data-h="20">
+        Poster
+        <span class="dim">16 × 20</span>
+      </button>
+    </div>
+
+    <div class="segmented cols-2" id="orient-row">
+      <button class="active" data-orient="portrait">Portrait</button>
+      <button data-orient="landscape">Landscape</button>
+    </div>
+  </div>
+
+  <!-- AREA SELECTION -->
+  <div class="section">
+    <div class="section-label">Area Selection</div>
+    <div class="segmented" id="tool-row">
+      <button class="active" data-tool="none">None</button>
+      <button data-tool="circle">Circle</button>
+      <button data-tool="rect">Rect</button>
+    </div>
+
+    <div id="circle-controls" style="display:none;">
+      <div class="radius-input-row">
+        <label>Radius</label>
+        <input type="number" class="radius-input" id="radius-input" value="3" min="0.1" step="0.1" />
+        <label>mi</label>
+      </div>
+      <div class="help-text">Click on the map to set the center, then drag to set the radius.</div>
+    </div>
+
+    <div id="rect-controls" style="display:none;">
+      <div class="help-text">Click and drag on the map to draw a rectangle.</div>
+    </div>
+
+    <div id="none-controls">
+      <div class="help-text">Pan and zoom the map. The accent frame shows what will print.</div>
+    </div>
+  </div>
+
+  <!-- INFO -->
+  <div class="section">
+    <div class="section-label">Map Info</div>
+    <div class="info-card">
+      <div class="info-row">
+        <span class="info-label">Center</span>
+        <span class="info-value" id="info-center">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Zoom</span>
+        <span class="info-value" id="info-zoom">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Scale</span>
+        <span class="info-value" id="info-scale">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Output</span>
+        <span class="info-value" id="info-output">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOWNLOAD -->
+  <div class="download-section">
+    <button class="download-btn" id="download-btn">
+      <span>Generate PDF</span>
+      <span class="arrow">↓</span>
+    </button>
+    <div class="download-status" id="download-status">Ready</div>
+  </div>
+</aside>
+
+<main class="map-container" id="map-container">
+  <div id="map"></div>
+
+  <div class="page-overlay">
+    <div class="page-frame" id="page-frame">
+      <div class="page-corner tl"></div>
+      <div class="page-corner tr"></div>
+      <div class="page-corner bl"></div>
+      <div class="page-corner br"></div>
+      <div class="page-label" id="page-label">8.5 × 11 PORTRAIT</div>
+    </div>
+  </div>
+
+  <div class="footer-info">
+    <span>OK</span> · Tulsa metro default · pan & zoom anywhere in Oklahoma
+  </div>
+
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-text" id="loading-text">Generating map</div>
+      <div class="loading-detail" id="loading-detail">Stitching tiles…</div>
+    </div>
+  </div>
+</main>
+
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+<script>
+// ============================================================
+// THEME
+// ============================================================
+function setTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem('maps-theme', theme); } catch {}
+  // Swap icon
+  const svg = document.getElementById('theme-icon');
+  if (theme === 'light') {
+    // sun icon
+    svg.innerHTML = `
+      <circle cx="12" cy="12" r="4"></circle>
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"></path>
+    `;
+  } else {
+    svg.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>`;
+  }
+}
+
+// Initialize theme — default dark, restore saved preference
+let savedTheme = 'dark';
+try { savedTheme = localStorage.getItem('maps-theme') || 'dark'; } catch {}
+setTheme(savedTheme);
+
+document.getElementById('theme-toggle').addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme');
+  setTheme(current === 'dark' ? 'light' : 'dark');
+});
+
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  pageSize: 'letter',
+  pageW: 8.5,
+  pageH: 11,
+  orientation: 'portrait',
+  tool: 'none',
+  selection: null,
+  styleId: 'light-v11',
+  isRaster: false,
+  // Layer prefs
+  labelDensity: 'all',
+  labelSize: 1.0,
+  labelBold: false,
+  roadWeight: 'default',
+  hidePOIs: false,
+  accentColor: '#6b8a5f',
+  map: null
+};
+
+// ============================================================
+// CUSTOM STYLE HOOK (v1.4 will populate this)
+// ============================================================
+// When forking styles in Mapbox Studio, add entries here:
+// 'wall-light-v1': { url: 'mapbox://styles/<username>/<style-id>', isRaster: false }
+// Then add a corresponding pill in the HTML markup with data-style="wall-light-v1".
+// generate-pdf.js will need its ALLOWED_STYLES whitelist updated too.
+const CUSTOM_STYLES = {};
+
+function styleUrlFor(styleId) {
+  if (CUSTOM_STYLES[styleId]) return CUSTOM_STYLES[styleId].url;
+  return `mapbox://styles/mapbox/${styleId}`;
+}
+
+// ============================================================
+// MAP BOOT
+// ============================================================
+async function bootMap() {
+  let token;
+  try {
+    const r = await fetch('/api/map-token');
+    if (!r.ok) throw new Error('Token fetch failed');
+    token = (await r.json()).token;
+  } catch (e) {
+    document.getElementById('loading-overlay').classList.add('active');
+    document.getElementById('loading-text').textContent = 'CONFIG ERROR';
+    document.getElementById('loading-detail').textContent = 'Could not load Mapbox token. Check Vercel env vars.';
+    return;
+  }
+
+  mapboxgl.accessToken = token;
+
+  state.map = new mapboxgl.Map({
+    container: 'map',
+    style: styleUrlFor(state.styleId),
+    center: [-95.9928, 36.1540],
+    zoom: 9,
+    attributionControl: { compact: true }
+  });
+
+  state.map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+  state.map.on('load', () => {
+    initSelectionLayers();
+    initSelectionHandlers();
+    applyAllLayerPrefs();
+    updateInfo();
+    updatePageFrame();
+  });
+
+  state.map.on('style.load', () => {
+    if (state.map.isStyleLoaded()) {
+      initSelectionLayers();
+      applyAllLayerPrefs();
+      if (state.selection) {
+        if (state.selection.type === 'circle') setCircleSelection(state.selection.center, state.selection.radiusMi);
+        else if (state.selection.type === 'rect') setRectSelection(state.selection.sw, state.selection.ne);
+      }
+    }
+  });
+
+  state.map.on('move', updateInfo);
+  state.map.on('zoom', updateInfo);
+  state.map.on('resize', updatePageFrame);
+}
+
+// ============================================================
+// LAYER PREFS
+// ============================================================
+const LAYER_PATTERNS = {
+  poi: /^poi-/i,
+  placeMajor: /^(country|state|continent)-label/i,
+  placeMid:   /^(settlement-major|place-city|settlement-subdivision)-label/i,
+  placeMinor: /^(settlement-minor|place-town|place-village|settlement|place-suburb|place-neighbourhood|place-hamlet|place-island)-label/i,
+  road: /^(road|tunnel|bridge)/i,
+  roadLabel: /-label$/i,
+  // Any symbol layer with text — used for size and weight
+  anyLabel: /-label$/i
+};
+
+function eachLayerMatching(rxs, fn) {
+  if (!state.map || !state.map.getStyle()) return;
+  const layers = state.map.getStyle().layers || [];
+  for (const layer of layers) {
+    for (const rx of rxs) {
+      if (rx.test(layer.id)) {
+        fn(layer);
+        break;
+      }
+    }
+  }
+}
+
+function applyAllLayerPrefs() {
+  applyLabelDensity();
+  applyLabelSize();
+  applyLabelWeight();
+  applyRoadWeight();
+  applyPOIToggle();
+}
+
+function applyLabelDensity() {
+  const d = state.labelDensity;
+  if (d === 'all') {
+    eachLayerMatching([LAYER_PATTERNS.placeMajor, LAYER_PATTERNS.placeMid, LAYER_PATTERNS.placeMinor], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'visible'); } catch {}
+    });
+  } else if (d === 'major') {
+    eachLayerMatching([LAYER_PATTERNS.placeMajor, LAYER_PATTERNS.placeMid], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'visible'); } catch {}
+    });
+    eachLayerMatching([LAYER_PATTERNS.placeMinor], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'none'); } catch {}
+    });
+  } else if (d === 'none') {
+    eachLayerMatching([LAYER_PATTERNS.placeMajor, LAYER_PATTERNS.placeMid, LAYER_PATTERNS.placeMinor], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'none'); } catch {}
+    });
+  }
+}
+
+function applyLabelSize() {
+  const factor = state.labelSize;
+  eachLayerMatching([LAYER_PATTERNS.anyLabel], (l) => {
+    if (l.type !== 'symbol') return;
+    try {
+      let cur = state.map.getLayoutProperty(l.id, 'text-size');
+      if (cur && !l.__originalTextSize) l.__originalTextSize = cur;
+      const orig = l.__originalTextSize ?? cur;
+      if (orig == null) return;
+      const scaled = scaleNumericExpr(orig, factor);
+      if (scaled != null) state.map.setLayoutProperty(l.id, 'text-size', scaled);
+    } catch {}
+  });
+}
+
+function applyLabelWeight() {
+  // Mapbox bundles DIN Pro Bold and DIN Pro Medium — switching to bold variants
+  // works without any Studio uploads. We swap text-font on any symbol-w/-text layer.
+  eachLayerMatching([LAYER_PATTERNS.anyLabel], (l) => {
+    if (l.type !== 'symbol') return;
+    try {
+      let cur = state.map.getLayoutProperty(l.id, 'text-font');
+      if (cur && !l.__originalTextFont) l.__originalTextFont = JSON.parse(JSON.stringify(cur));
+      const orig = l.__originalTextFont ?? cur;
+      if (!orig) return;
+
+      let next;
+      if (state.labelBold) {
+        next = swapFontTo(orig, 'bold');
+      } else {
+        next = orig;
+      }
+      state.map.setLayoutProperty(l.id, 'text-font', next);
+    } catch {}
+  });
+}
+
+// Walk a text-font value (array, string, or expression) and swap the family
+// names to bold variants where possible. Mapbox provides DIN Pro Bold,
+// Open Sans Bold, etc. as part of the default Mapbox glyph set.
+function swapFontTo(value, target) {
+  // target: 'bold' | 'regular'
+  const swap = (name) => {
+    if (typeof name !== 'string') return name;
+    if (target === 'bold') {
+      // Replace common weight terms with Bold
+      return name
+        .replace(/Regular/i, 'Bold')
+        .replace(/Medium/i, 'Bold')
+        .replace(/Italic/i, 'Bold Italic');
+    }
+    return name;
+  };
+
+  if (Array.isArray(value)) return value.map(v => swapFontTo(v, target));
+  if (typeof value === 'string') return swap(value);
+  return value;
+}
+
+function applyRoadWeight() {
+  const factor = state.roadWeight === 'bold' ? 1.6 :
+                 state.roadWeight === 'subtle' ? 0.55 : 1.0;
+  eachLayerMatching([LAYER_PATTERNS.road], (l) => {
+    if (l.type !== 'line') return;
+    if (LAYER_PATTERNS.roadLabel.test(l.id)) return;
+    try {
+      const cur = state.map.getPaintProperty(l.id, 'line-width');
+      if (cur && !l.__originalWidth) l.__originalWidth = cur;
+      const orig = l.__originalWidth ?? cur;
+      if (orig == null) return;
+      const scaled = scaleNumericExpr(orig, factor);
+      if (scaled != null) state.map.setPaintProperty(l.id, 'line-width', scaled);
+    } catch {}
+  });
+}
+
+function applyPOIToggle() {
+  eachLayerMatching([LAYER_PATTERNS.poi], (l) => {
+    try { state.map.setLayoutProperty(l.id, 'visibility', state.hidePOIs ? 'none' : 'visible'); } catch {}
+  });
+}
+
+// Scale a Mapbox numeric expression by a factor while preserving structure.
+function scaleNumericExpr(expr, factor) {
+  if (factor === 1.0) return expr;
+  if (typeof expr === 'number') return expr * factor;
+  if (Array.isArray(expr)) {
+    return expr.map(v => typeof v === 'number' ? v * factor : (Array.isArray(v) ? scaleNumericExpr(v, factor) : v));
+  }
+  if (expr && typeof expr === 'object' && Array.isArray(expr.stops)) {
+    return { ...expr, stops: expr.stops.map(([z, v]) => [z, typeof v === 'number' ? v * factor : v]) };
+  }
+  return expr;
+}
+
+// ============================================================
+// SELECTION LAYERS
+// ============================================================
+function initSelectionLayers() {
+  if (state.map.getSource('selection-fill')) return;
+
+  state.map.addSource('selection-fill', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] }
+  });
+  state.map.addSource('selection-line', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] }
+  });
+
+  state.map.addLayer({
+    id: 'selection-fill-layer',
+    type: 'fill',
+    source: 'selection-fill',
+    paint: { 'fill-color': state.accentColor, 'fill-opacity': 0.10 }
+  });
+  state.map.addLayer({
+    id: 'selection-line-layer',
+    type: 'line',
+    source: 'selection-line',
+    paint: {
+      'line-color': state.accentColor,
+      'line-width': 2,
+      'line-dasharray': [2, 2]
+    }
+  });
+}
+
+function refreshSelectionLayerColor() {
+  if (!state.map) return;
+  if (state.map.getLayer('selection-fill-layer')) {
+    state.map.setPaintProperty('selection-fill-layer', 'fill-color', state.accentColor);
+  }
+  if (state.map.getLayer('selection-line-layer')) {
+    state.map.setPaintProperty('selection-line-layer', 'line-color', state.accentColor);
+  }
+}
+
+function clearSelection() {
+  state.selection = null;
+  if (state.map.getSource('selection-fill')) {
+    state.map.getSource('selection-fill').setData({ type: 'FeatureCollection', features: [] });
+    state.map.getSource('selection-line').setData({ type: 'FeatureCollection', features: [] });
+  }
+}
+
+function setCircleSelection(center, radiusMi) {
+  state.selection = { type: 'circle', center, radiusMi };
+  if (!state.map.getSource('selection-fill')) return;
+  const poly = circleToPolygon(center, radiusMi);
+  state.map.getSource('selection-fill').setData({
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', geometry: poly }]
+  });
+  state.map.getSource('selection-line').setData({
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: poly.coordinates[0] } }]
+  });
+}
+
+function setRectSelection(sw, ne) {
+  state.selection = { type: 'rect', sw, ne };
+  if (!state.map.getSource('selection-fill')) return;
+  const ring = [
+    [sw[0], sw[1]], [ne[0], sw[1]], [ne[0], ne[1]], [sw[0], ne[1]], [sw[0], sw[1]]
+  ];
+  state.map.getSource('selection-fill').setData({
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] } }]
+  });
+  state.map.getSource('selection-line').setData({
+    type: 'FeatureCollection',
+    features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: ring } }]
+  });
+}
+
+function circleToPolygon(center, radiusMi, steps = 64) {
+  const [lng, lat] = center;
+  const radiusKm = radiusMi * 1.609344;
+  const earthR = 6371;
+  const angDist = radiusKm / earthR;
+  const latRad = lat * Math.PI / 180;
+  const lngRad = lng * Math.PI / 180;
+  const coords = [];
+  for (let i = 0; i <= steps; i++) {
+    const brg = (i / steps) * 2 * Math.PI;
+    const newLat = Math.asin(Math.sin(latRad) * Math.cos(angDist) + Math.cos(latRad) * Math.sin(angDist) * Math.cos(brg));
+    const newLng = lngRad + Math.atan2(
+      Math.sin(brg) * Math.sin(angDist) * Math.cos(latRad),
+      Math.cos(angDist) - Math.sin(latRad) * Math.sin(newLat)
+    );
+    coords.push([newLng * 180 / Math.PI, newLat * 180 / Math.PI]);
+  }
+  return { type: 'Polygon', coordinates: [coords] };
+}
+
+// ============================================================
+// SELECTION HANDLERS
+// ============================================================
+function initSelectionHandlers() {
+  let dragging = false;
+  let startLngLat = null;
+
+  state.map.on('mousedown', (e) => {
+    if (state.tool === 'none') return;
+    e.preventDefault();
+    state.map.dragPan.disable();
+    dragging = true;
+    startLngLat = [e.lngLat.lng, e.lngLat.lat];
+
+    if (state.tool === 'circle') {
+      setCircleSelection(startLngLat, parseFloat(document.getElementById('radius-input').value) || 1);
+    }
+  });
+
+  state.map.on('mousemove', (e) => {
+    if (!dragging || state.tool === 'none') return;
+    const cur = [e.lngLat.lng, e.lngLat.lat];
+
+    if (state.tool === 'circle') {
+      const dist = haversineMi(startLngLat, cur);
+      document.getElementById('radius-input').value = dist.toFixed(2);
+      setCircleSelection(startLngLat, dist);
+    } else if (state.tool === 'rect') {
+      const sw = [Math.min(startLngLat[0], cur[0]), Math.min(startLngLat[1], cur[1])];
+      const ne = [Math.max(startLngLat[0], cur[0]), Math.max(startLngLat[1], cur[1])];
+      setRectSelection(sw, ne);
+    }
+  });
+
+  state.map.on('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    state.map.dragPan.enable();
+    fitToSelection();
+  });
+
+  document.getElementById('radius-input').addEventListener('input', (e) => {
+    if (state.selection?.type === 'circle') {
+      const r = parseFloat(e.target.value) || 0.1;
+      setCircleSelection(state.selection.center, r);
+      fitToSelection();
+    }
+  });
+}
+
+function haversineMi(a, b) {
+  const R = 3958.756;
+  const dLat = (b[1] - a[1]) * Math.PI / 180;
+  const dLng = (b[0] - a[0]) * Math.PI / 180;
+  const lat1 = a[1] * Math.PI / 180;
+  const lat2 = b[1] * Math.PI / 180;
+  const x = Math.sin(dLat/2) ** 2 + Math.sin(dLng/2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+  return 2 * R * Math.asin(Math.sqrt(x));
+}
+
+function fitToSelection() {
+  if (!state.selection) return;
+  let bounds;
+  if (state.selection.type === 'circle') {
+    const poly = circleToPolygon(state.selection.center, state.selection.radiusMi);
+    bounds = new mapboxgl.LngLatBounds();
+    poly.coordinates[0].forEach(c => bounds.extend(c));
+  } else {
+    bounds = new mapboxgl.LngLatBounds(state.selection.sw, state.selection.ne);
+  }
+  state.map.fitBounds(bounds, { padding: 40, duration: 600 });
+}
+
+// ============================================================
+// PAGE FRAME
+// ============================================================
+function currentPageDims() {
+  let w = state.pageW, h = state.pageH;
+  if (state.orientation === 'landscape') [w, h] = [h, w];
+  return { w, h };
+}
+
+function currentPageAspect() {
+  const { w, h } = currentPageDims();
+  return w / h;
+}
+
+function updatePageFrame() {
+  const container = document.getElementById('map-container');
+  const cw = container.clientWidth;
+  const ch = container.clientHeight;
+  const pageAspect = currentPageAspect();
+  const containerAspect = cw / ch;
+
+  const pad = 60;
+  let frameW, frameH;
+  if (containerAspect > pageAspect) {
+    frameH = ch - pad * 2;
+    frameW = frameH * pageAspect;
+  } else {
+    frameW = cw - pad * 2;
+    frameH = frameW / pageAspect;
+  }
+
+  const frame = document.getElementById('page-frame');
+  frame.style.width = `${frameW}px`;
+  frame.style.height = `${frameH}px`;
+  frame.style.left = `${(cw - frameW) / 2}px`;
+  frame.style.top = `${(ch - frameH) / 2}px`;
+
+  const { w, h } = currentPageDims();
+  document.getElementById('page-label').textContent = `${w} × ${h} ${state.orientation.toUpperCase()}`;
+
+  updateInfo();
+  updateStyleWarning();
+}
+
+function updateInfo() {
+  if (!state.map) return;
+  const c = state.map.getCenter();
+  document.getElementById('info-center').textContent = `${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`;
+  document.getElementById('info-zoom').textContent = state.map.getZoom().toFixed(2);
+
+  const z = state.map.getZoom();
+  const lat = c.lat;
+  const metersPerPx = 156543.03392 * Math.cos(lat * Math.PI / 180) / Math.pow(2, z);
+  const inchesPerPx = metersPerPx * 39.3701;
+  const scaleRatio = inchesPerPx * 96;
+  document.getElementById('info-scale').textContent = `1:${Math.round(scaleRatio).toLocaleString()}`;
+
+  const { w, h } = currentPageDims();
+  document.getElementById('info-output').textContent = `${w}×${h} @ 300dpi`;
+}
+
+function updateStyleWarning() {
+  const warn = document.getElementById('style-warning');
+  if (state.isRaster && state.pageSize === 'poster') warn.classList.add('visible');
+  else warn.classList.remove('visible');
+}
+
+// ============================================================
+// CONTROLS
+// ============================================================
+document.querySelectorAll('#style-row .style-pill').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#style-row .style-pill').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.styleId = btn.dataset.style;
+    state.isRaster = btn.dataset.raster === 'true';
+    state.map.setStyle(styleUrlFor(state.styleId));
+    updateStyleWarning();
+  });
+});
+
+document.querySelectorAll('.size-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.pageSize = btn.dataset.size;
+    state.pageW = parseFloat(btn.dataset.w);
+    state.pageH = parseFloat(btn.dataset.h);
+    updatePageFrame();
+  });
+});
+
+document.querySelectorAll('#orient-row button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#orient-row button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.orientation = btn.dataset.orient;
+    updatePageFrame();
+  });
+});
+
+document.querySelectorAll('#tool-row button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#tool-row button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.tool = btn.dataset.tool;
+
+    document.getElementById('circle-controls').style.display = state.tool === 'circle' ? 'block' : 'none';
+    document.getElementById('rect-controls').style.display = state.tool === 'rect' ? 'block' : 'none';
+    document.getElementById('none-controls').style.display = state.tool === 'none' ? 'block' : 'none';
+
+    document.body.classList.toggle('mode-circle', state.tool === 'circle');
+    document.body.classList.toggle('mode-rect', state.tool === 'rect');
+
+    if (state.tool === 'none') clearSelection();
+  });
+});
+
+// Label density
+document.querySelectorAll('#label-density button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#label-density button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.labelDensity = btn.dataset.density;
+    applyLabelDensity();
+  });
+});
+
+// Label size slider
+const labelSizeInput = document.getElementById('label-size');
+const labelSizeVal = document.getElementById('label-size-val');
+labelSizeInput.addEventListener('input', (e) => {
+  state.labelSize = parseFloat(e.target.value);
+  labelSizeVal.textContent = `${state.labelSize.toFixed(2)}×`;
+  applyLabelSize();
+});
+
+// Label bold toggle
+document.getElementById('label-bold-toggle').addEventListener('click', (e) => {
+  state.labelBold = !state.labelBold;
+  e.currentTarget.classList.toggle('on', state.labelBold);
+  applyLabelWeight();
+});
+
+// Road weight
+document.querySelectorAll('#road-weight button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#road-weight button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.roadWeight = btn.dataset.weight;
+    applyRoadWeight();
+  });
+});
+
+// POI toggle
+document.getElementById('poi-toggle').addEventListener('click', (e) => {
+  state.hidePOIs = !state.hidePOIs;
+  e.currentTarget.classList.toggle('on', state.hidePOIs);
+  applyPOIToggle();
+});
+
+// Color picker
+document.querySelectorAll('.color-swatch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+    sw.classList.add('active');
+    state.accentColor = sw.dataset.color;
+    refreshSelectionLayerColor();
+  });
+});
+
+// ============================================================
+// PDF GENERATION
+// ============================================================
+document.getElementById('download-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('download-btn');
+  const status = document.getElementById('download-status');
+  const overlay = document.getElementById('loading-overlay');
+  const loadingDetail = document.getElementById('loading-detail');
+
+  btn.disabled = true;
+  overlay.classList.add('active');
+  status.className = 'download-status';
+  status.textContent = 'Generating…';
+
+  const frame = document.getElementById('page-frame');
+  const rect = frame.getBoundingClientRect();
+  const mapRect = document.getElementById('map').getBoundingClientRect();
+  const tl = state.map.unproject([rect.left - mapRect.left, rect.top - mapRect.top]);
+  const br = state.map.unproject([rect.right - mapRect.left, rect.bottom - mapRect.top]);
+
+  const { w, h } = currentPageDims();
+
+  const payload = {
+    bounds: {
+      west: Math.min(tl.lng, br.lng),
+      east: Math.max(tl.lng, br.lng),
+      north: Math.max(tl.lat, br.lat),
+      south: Math.min(tl.lat, br.lat)
+    },
+    pageWidthIn: w,
+    pageHeightIn: h,
+    selection: state.selection,
+    styleId: state.styleId,
+    accentColor: state.accentColor
+  };
+
+  try {
+    loadingDetail.textContent = 'Requesting tiles…';
+    const res = await fetch('/api/generate-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err || `HTTP ${res.status}`);
+    }
+
+    loadingDetail.textContent = 'Building PDF…';
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const styleName = state.styleId.replace(/-v\d+$/, '');
+    a.download = `wall-map-${styleName}-${w}x${h}-${Date.now()}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    status.className = 'download-status success';
+    status.textContent = 'Downloaded';
+  } catch (e) {
+    console.error(e);
+    status.className = 'download-status error';
+    status.textContent = 'Error — ' + (e.message || 'unknown');
+  } finally {
+    btn.disabled = false;
+    overlay.classList.remove('active');
+    setTimeout(() => {
+      if (status.textContent === 'Downloaded') {
+        status.className = 'download-status';
+        status.textContent = 'Ready';
+      }
+    }, 3500);
+  }
+});
+
+window.addEventListener('resize', updatePageFrame);
+bootMap();
+</script>
+</body>
+</html>
