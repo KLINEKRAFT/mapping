@@ -28,8 +28,6 @@ The style picker is now organized into three categories: Standard, KLINEKRAFT Mo
   - `mapbox-custom`: same Static Images API, but with a user-defined Studio style path. Falls back to `light-v11` if path is null.
   - `stadia`: Stadia Maps slippy XYZ tiles. Picks the smallest zoom level that meets 300 DPI for the requested print size, fetches every tile that intersects the bbox, and embeds each one at its exact lat/lng position via Web Mercator math. Up to 600 tiles per request, fetched in parallel batches of 16.
 
-All API endpoints run on Vercel's **Node.js runtime** (1 GB memory, 60 s timeout). Earlier versions used the Edge runtime, but the 128 MB memory cap caused crashes when generating 16×20 satellite maps where pdf-lib needed to embed multi-MB JPEG buffers. Each endpoint uses the `fetch` Web Standard export pattern: `export default { fetch: handler }`.
-
 ---
 
 ## Setup on Vercel
