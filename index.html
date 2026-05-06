@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>maps // klinekraft</title>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  /* ============================================================
+     KLINEKRAFT // CARTO  v1.7.0
+     Modern monochrome — Inter sans + JetBrains Mono, sharp 0px
+     ============================================================ */
+  :root {
+    --black:           #000000;
+    --white:           #FFFFFF;
+    --muted:           #F5F5F5;
+    --muted-fg:        #525252;
+    --border-light:    #E5E5E5;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    overflow: hidden;
+    background: var(--white);
+    color: var(--black);
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    font-feature-settings: "kern" 1, "liga" 1, "ss01" 1, "cv11" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Subtle horizontal-line texture for printed-paper feel */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 1;
+    background-image: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 1px,
+      var(--black) 1px,
+      var(--black) 2px
+    );
+    background-size: 100% 4px;
+    opacity: 0.012;
+  }
+
+  button, input, select { font-family: inherit; color: inherit; }
+  button { cursor: pointer; }
+
+  /* Mono shorthand */
+  .mono {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-feature-settings: "ss01" 1;
+  }
+
+  /* ============================================================
+     LAYOUT
+     ============================================================ */
+  .sidebar {
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    width: 380px;
+    background: var(--white);
+    border-right: 2px solid var(--black);
+    overflow-y: auto;
+    padding: 40px 32px 24px;
+    z-index: 10;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 0; }
+
+  .map-container {
+    position: fixed;
+    top: 0; left: 380px; right: 0; bottom: 0;
+    background: var(--muted);
+  }
+
+  #map { position: absolute; inset: 0; }
+
+  /* ============================================================
+     HEADER
+     ============================================================ */
+  .sidebar-header {
+    border-bottom: 4px solid var(--black);
+    padding-bottom: 24px;
+    margin-bottom: 32px;
+  }
+
+  .brand-line {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--black);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .brand-line::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--black);
+  }
+
+  h1 {
+    font-family: "Inter", -apple-system, sans-serif;
+    font-weight: 900;
+    font-size: 44px;
+    line-height: 1.0;
+    letter-spacing: -0.035em;
+    margin: 0 0 14px 0;
+    color: var(--black);
+  }
+
+  .subtitle {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+  }
+
+  /* ============================================================
+     SECTIONS
+     ============================================================ */
+  .section {
+    margin-bottom: 32px;
+    padding-bottom: 32px;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .section:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .section-label {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--black);
+    margin-bottom: 16px;
+    font-weight: 600;
+  }
+
+  .style-cat {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 9px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+    margin-top: 16px;
+    margin-bottom: 8px;
+  }
+  .style-cat:first-of-type { margin-top: 0; }
+
+  /* ============================================================
+     STYLE BUTTONS
+     ============================================================ */
+  .style-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .style-list .style-btn + .style-btn { margin-top: -1px; }
+
+  .style-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 13px 16px;
+    background: var(--white);
+    color: var(--black);
+    border: 1px solid var(--black);
+    border-radius: 0;
+    font-family: "Inter", sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.2;
+    text-align: left;
+    transition: background 100ms, color 100ms;
+    position: relative;
+    letter-spacing: -0.005em;
+  }
+  .style-btn:hover:not(.active):not(:disabled) {
+    background: var(--black);
+    color: var(--white);
+  }
+  .style-btn.active {
+    background: var(--black);
+    color: var(--white);
+  }
+  .style-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .style-btn .meta {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    font-weight: 400;
+  }
+  .style-btn.active .meta { opacity: 0.7; }
+  .style-btn:focus-visible {
+    outline: 3px solid var(--black);
+    outline-offset: 3px;
+    z-index: 2;
+  }
+
+  /* ============================================================
+     SEGMENTED CONTROLS
+     ============================================================ */
+  .segmented {
+    display: flex;
+    border: 1px solid var(--black);
+  }
+  .segmented button {
+    flex: 1;
+    padding: 10px 8px;
+    background: var(--white);
+    color: var(--black);
+    border: none;
+    border-right: 1px solid var(--black);
+    border-radius: 0;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    transition: background 100ms, color 100ms;
+    font-weight: 500;
+  }
+  .segmented button:last-child { border-right: none; }
+  .segmented button:hover:not(.active) {
+    background: var(--black);
+    color: var(--white);
+  }
+  .segmented button.active {
+    background: var(--black);
+    color: var(--white);
+  }
+  .segmented button:focus-visible {
+    outline: 3px solid var(--black);
+    outline-offset: 3px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ============================================================
+     SLIDER
+     ============================================================ */
+  .slider-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 10px;
+  }
+  .slider-meta .label {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+    font-weight: 500;
+  }
+  .slider-meta .v {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--black);
+    font-weight: 600;
+  }
+
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 1px;
+    background: var(--black);
+    outline: none;
+    margin: 16px 0;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--black);
+    border: 2px solid var(--black);
+    cursor: pointer;
+    border-radius: 0;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--black);
+    border: 2px solid var(--black);
+    cursor: pointer;
+    border-radius: 0;
+  }
+
+  /* ============================================================
+     TOGGLES
+     ============================================================ */
+  .toggle-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 0;
+  }
+  .toggle-row label {
+    font-family: "Inter", sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--black);
+  }
+  .toggle {
+    width: 40px;
+    height: 20px;
+    background: var(--white);
+    border: 2px solid var(--black);
+    cursor: pointer;
+    position: relative;
+    transition: background 100ms;
+    border-radius: 0;
+  }
+  .toggle::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 12px;
+    height: 12px;
+    background: var(--black);
+    transition: left 100ms, background 100ms;
+  }
+  .toggle.on { background: var(--black); }
+  .toggle.on::after { left: 22px; background: var(--white); }
+  .toggle:focus-visible {
+    outline: 3px solid var(--black);
+    outline-offset: 3px;
+  }
+
+  /* ============================================================
+     PAGE SIZE GRID
+     ============================================================ */
+  .size-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    margin-bottom: 12px;
+    border: 1px solid var(--black);
+  }
+  .size-btn {
+    padding: 14px 10px;
+    background: var(--white);
+    color: var(--black);
+    border: none;
+    border-right: 1px solid var(--black);
+    border-radius: 0;
+    text-align: center;
+    transition: background 100ms, color 100ms;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+    font-family: "Inter", sans-serif;
+  }
+  .size-btn:last-child { border-right: none; }
+  .size-btn .name {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.015em;
+  }
+  .size-btn .dim {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 9px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.6;
+    font-weight: 500;
+  }
+  .size-btn:hover:not(.active) {
+    background: var(--black);
+    color: var(--white);
+  }
+  .size-btn.active {
+    background: var(--black);
+    color: var(--white);
+  }
+  .size-btn:focus-visible {
+    outline: 3px solid var(--black);
+    outline-offset: 3px;
+    position: relative;
+    z-index: 2;
+  }
+
+  /* ============================================================
+     RADIUS INPUT / HELP TEXT
+     ============================================================ */
+  .radius-input-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 16px 0 8px;
+  }
+  .radius-input-row label {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+    font-weight: 500;
+  }
+  .radius-input {
+    flex: 1;
+    padding: 8px 10px;
+    background: var(--white);
+    color: var(--black);
+    border: none;
+    border-bottom: 2px solid var(--black);
+    border-radius: 0;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 14px;
+    text-align: right;
+    outline: none;
+  }
+  .radius-input:focus {
+    border-bottom-width: 4px;
+    margin-bottom: -2px;
+  }
+
+  .help-text {
+    font-family: "Inter", sans-serif;
+    font-size: 13px;
+    color: var(--muted-fg);
+    line-height: 1.5;
+    margin-top: 12px;
+    padding-left: 12px;
+    border-left: 2px solid var(--black);
+  }
+
+  /* ============================================================
+     INFO CARD
+     ============================================================ */
+  .info-card {
+    border: 1px solid var(--black);
+    padding: 14px 16px;
+  }
+  .info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--border-light);
+  }
+  .info-row:last-child { border-bottom: none; }
+  .info-label {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+    font-weight: 500;
+  }
+  .info-value {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--black);
+    font-weight: 600;
+  }
+
+  /* ============================================================
+     STYLE WARNING
+     ============================================================ */
+  .style-warning {
+    display: none;
+    margin-top: 16px;
+    padding: 12px 14px;
+    border: 1px solid var(--black);
+    background: var(--black);
+    color: var(--white);
+    font-family: "Inter", sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+  }
+  .style-warning.visible { display: block; }
+
+  /* ============================================================
+     DOWNLOAD SECTION
+     ============================================================ */
+  .download-section {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 4px solid var(--black);
+  }
+  .download-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 18px 22px;
+    background: var(--black);
+    color: var(--white);
+    border: 2px solid var(--black);
+    border-radius: 0;
+    font-family: "Inter", sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    transition: background 100ms, color 100ms;
+  }
+  .download-btn .arrow {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 16px;
+    font-weight: 600;
+  }
+  .download-btn:hover:not(:disabled) {
+    background: var(--white);
+    color: var(--black);
+  }
+  .download-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .download-btn:focus-visible {
+    outline: 3px solid var(--black);
+    outline-offset: 3px;
+  }
+  .download-status {
+    margin-top: 14px;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+    text-align: center;
+    font-weight: 500;
+  }
+  .download-status.success { color: var(--black); font-weight: 600; }
+  .download-status.error { color: var(--black); font-weight: 600; }
+
+  /* ============================================================
+     PAGE FRAME OVERLAY
+     ============================================================ */
+  .page-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 5;
+  }
+  .page-frame {
+    border: 2px solid var(--black);
+    background: rgba(255, 255, 255, 0.06);
+    box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.18);
+    position: relative;
+  }
+  .page-corner {
+    position: absolute;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--black);
+  }
+  .page-corner.tl { top: -2px; left: -2px; border-right: none; border-bottom: none; background: var(--white); }
+  .page-corner.tr { top: -2px; right: -2px; border-left: none; border-bottom: none; background: var(--white); }
+  .page-corner.bl { bottom: -2px; left: -2px; border-right: none; border-top: none; background: var(--white); }
+  .page-corner.br { bottom: -2px; right: -2px; border-left: none; border-top: none; background: var(--white); }
+  .page-label {
+    position: absolute;
+    top: -36px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--white);
+    color: var(--black);
+    padding: 6px 14px;
+    border: 2px solid var(--black);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  /* ============================================================
+     FOOTER
+     ============================================================ */
+  .footer-info {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--white);
+    color: var(--black);
+    padding: 10px 18px;
+    border: 2px solid var(--black);
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    z-index: 5;
+    pointer-events: none;
+    font-weight: 500;
+  }
+  .footer-info span { font-weight: 700; }
+
+  /* ============================================================
+     LOADING OVERLAY
+     ============================================================ */
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.95);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .loading-overlay.visible { display: flex; }
+  .loading-content {
+    text-align: center;
+    border: 2px solid var(--black);
+    padding: 40px 60px;
+    background: var(--white);
+  }
+  .loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 2px solid var(--border-light);
+    border-top-color: var(--black);
+    margin: 0 auto 24px;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text {
+    font-family: "Inter", sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--black);
+    margin-bottom: 8px;
+  }
+  .loading-detail {
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 10px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted-fg);
+    font-weight: 500;
+  }
+
+  /* ============================================================
+     MAPBOX OVERRIDES
+     ============================================================ */
+  .mapboxgl-ctrl-group {
+    border: 2px solid var(--black) !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: var(--white) !important;
+  }
+  .mapboxgl-ctrl-group button {
+    width: 36px !important;
+    height: 36px !important;
+    border-radius: 0 !important;
+    background-color: var(--white) !important;
+    border-bottom: 1px solid var(--black) !important;
+  }
+  .mapboxgl-ctrl-group button:last-child { border-bottom: none !important; }
+  .mapboxgl-ctrl-group button:hover {
+    background-color: var(--black) !important;
+  }
+  .mapboxgl-ctrl-group button:hover .mapboxgl-ctrl-icon { filter: invert(1); }
+  .mapboxgl-ctrl-attrib {
+    background: var(--white) !important;
+    border: 1px solid var(--black);
+    border-radius: 0 !important;
+    font-family: "JetBrains Mono", ui-monospace, monospace !important;
+    font-size: 9px !important;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+  .mapboxgl-ctrl-attrib a { color: var(--black) !important; }
+
+  /* ============================================================
+     RESPONSIVE
+     ============================================================ */
+  @media (max-width: 900px) {
+    .sidebar { width: 100%; height: 50%; bottom: 50%; border-right: none; border-bottom: 2px solid var(--black); }
+    .map-container { left: 0; top: 50%; }
+    h1 { font-size: 32px; }
+  }
+</style>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <div class="brand-line">klinekraft // carto</div>
+    <h1>Wall Map<br>Generator</h1>
+    <div class="subtitle">v1.7.1 — 300 dpi print-ready</div>
+  </div>
+
+  <!-- MAP STYLE -->
+  <div class="section">
+    <div class="section-label">Map Style</div>
+
+    <div class="style-cat">Klinekraft Carto</div>
+    <div class="style-list" id="style-list-kk">
+      <button class="style-btn" data-style="kk-carto" data-provider="mapbox-custom" data-raster="false">
+        <span>KK Carto</span>
+        <span class="meta">vector</span>
+      </button>
+      <button class="style-btn" data-style="kk-carto-light" data-provider="mapbox-custom" data-raster="false">
+        <span>KK Carto Light</span>
+        <span class="meta">vector</span>
+      </button>
+      <button class="style-btn" data-style="kk-carto-bright" data-provider="mapbox-custom" data-raster="false">
+        <span>KK Carto Bright</span>
+        <span class="meta">vector</span>
+      </button>
+      <button class="style-btn" data-style="kk-carto-heritage" data-provider="mapbox-custom" data-raster="false">
+        <span>KK Carto Heritage</span>
+        <span class="meta">vector</span>
+      </button>
+      <button class="style-btn" data-style="kk-carto-mist" data-provider="mapbox-custom" data-raster="false">
+        <span>KK Carto Mist</span>
+        <span class="meta">vector</span>
+      </button>
+      <button class="style-btn" data-style="kk-carto-midnight" data-provider="mapbox-custom" data-raster="false">
+        <span>KK Carto Midnight</span>
+        <span class="meta">vector · dark</span>
+      </button>
+      <button class="style-btn" data-style="kk-cb-mono" data-provider="mapbox-custom" data-raster="false">
+        <span>CB Blue Mono</span>
+        <span class="meta">vector</span>
+      </button>
+    </div>
+
+    <div class="style-cat">Standard</div>
+    <div class="style-list" id="style-list-standard">
+      <button class="style-btn active" data-style="light-v11" data-provider="mapbox" data-raster="false">
+        <span>Light</span>
+        <span class="meta">vector</span>
+      </button>
+      <button class="style-btn" data-style="streets-v12" data-provider="mapbox" data-raster="false">
+        <span>Streets</span>
+        <span class="meta">vector</span>
+      </button>
+      <button class="style-btn" data-style="outdoors-v12" data-provider="mapbox" data-raster="false">
+        <span>Outdoors</span>
+        <span class="meta">vector</span>
+      </button>
+      <button class="style-btn" data-style="satellite-v9" data-provider="mapbox" data-raster="true">
+        <span>Satellite</span>
+        <span class="meta">raster</span>
+      </button>
+      <button class="style-btn" data-style="satellite-streets-v12" data-provider="mapbox" data-raster="true">
+        <span>Satellite Streets</span>
+        <span class="meta">raster</span>
+      </button>
+    </div>
+
+    <div class="style-warning" id="style-warning">
+      Heads-up — this style ships as raster imagery. May appear soft on a 16×20 print of a small area. Vector styles stay crisp at any size.
+    </div>
+  </div>
+
+  <!-- LABELS -->
+  <div class="section">
+    <div class="section-label">Labels</div>
+
+    <div style="margin-bottom: 20px;">
+      <div class="slider-meta" style="margin-bottom: 8px;">
+        <span class="label">Density</span>
+      </div>
+      <div class="segmented" id="label-density">
+        <button class="active" data-density="all">All</button>
+        <button data-density="major">Major</button>
+        <button data-density="none">None</button>
+      </div>
+    </div>
+
+    <div style="margin-bottom: 8px;">
+      <div class="slider-meta">
+        <span class="label">Size</span>
+        <span class="v" id="label-size-val">1.0×</span>
+      </div>
+      <input type="range" id="label-size" min="0.7" max="2.5" step="0.05" value="1.0" />
+    </div>
+
+    <div class="toggle-row">
+      <label>Bold labels</label>
+      <div class="toggle" id="label-bold-toggle" tabindex="0" role="switch" aria-checked="false"></div>
+    </div>
+  </div>
+
+  <!-- LAYERS -->
+  <div class="section">
+    <div class="section-label">Layers</div>
+
+    <div style="margin-bottom: 20px;">
+      <div class="slider-meta" style="margin-bottom: 8px;">
+        <span class="label">Road Weight</span>
+      </div>
+      <div class="segmented" id="road-weight">
+        <button data-weight="subtle">Subtle</button>
+        <button class="active" data-weight="default">Default</button>
+        <button data-weight="bold">Bold</button>
+      </div>
+    </div>
+
+    <div class="toggle-row">
+      <label>Hide POIs</label>
+      <div class="toggle" id="poi-toggle" tabindex="0" role="switch" aria-checked="false"></div>
+    </div>
+  </div>
+
+  <!-- PAGE SIZE -->
+  <div class="section">
+    <div class="section-label">Page Size</div>
+    <div class="size-grid">
+      <button class="size-btn active" data-size="letter" data-w="8.5" data-h="11">
+        <span class="name">Letter</span>
+        <span class="dim">8.5 × 11</span>
+      </button>
+      <button class="size-btn" data-size="tabloid" data-w="11" data-h="17">
+        <span class="name">Tabloid</span>
+        <span class="dim">11 × 17</span>
+      </button>
+      <button class="size-btn" data-size="poster" data-w="16" data-h="20">
+        <span class="name">Poster</span>
+        <span class="dim">16 × 20</span>
+      </button>
+    </div>
+
+    <div class="segmented" id="orient-row">
+      <button class="active" data-orient="portrait">Portrait</button>
+      <button data-orient="landscape">Landscape</button>
+    </div>
+  </div>
+
+  <!-- AREA SELECTION -->
+  <div class="section">
+    <div class="section-label">Area Selection</div>
+    <div class="segmented" id="tool-row">
+      <button class="active" data-tool="none">None</button>
+      <button data-tool="circle">Circle</button>
+      <button data-tool="rect">Rect</button>
+    </div>
+
+    <div id="circle-controls" style="display:none;">
+      <div class="radius-input-row">
+        <label>Radius</label>
+        <input type="number" class="radius-input" id="radius-input" value="3" min="0.1" step="0.1" />
+        <label>mi</label>
+      </div>
+      <div class="help-text">Click on the map to set the center, then drag to set the radius.</div>
+    </div>
+
+    <div id="rect-controls" style="display:none;">
+      <div class="help-text">Click and drag on the map to draw a rectangle.</div>
+    </div>
+
+    <div id="none-controls">
+      <div class="help-text">Pan and zoom the map. The framed area shows what will print.</div>
+    </div>
+  </div>
+
+  <!-- INFO -->
+  <div class="section">
+    <div class="section-label">Map Info</div>
+    <div class="info-card">
+      <div class="info-row">
+        <span class="info-label">Center</span>
+        <span class="info-value" id="info-center">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Zoom</span>
+        <span class="info-value" id="info-zoom">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Scale</span>
+        <span class="info-value" id="info-scale">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Output</span>
+        <span class="info-value" id="info-output">—</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOWNLOAD -->
+  <div class="download-section">
+    <button class="download-btn" id="download-btn">
+      <span>Generate PDF</span>
+      <span class="arrow">→</span>
+    </button>
+    <div class="download-status" id="download-status">Ready</div>
+  </div>
+</aside>
+
+<main class="map-container" id="map-container">
+  <div id="map"></div>
+
+  <div class="page-overlay">
+    <div class="page-frame" id="page-frame">
+      <div class="page-corner tl"></div>
+      <div class="page-corner tr"></div>
+      <div class="page-corner bl"></div>
+      <div class="page-corner br"></div>
+      <div class="page-label" id="page-label">8.5 × 11 PORTRAIT</div>
+    </div>
+  </div>
+
+  <div class="footer-info">
+    <span>OK</span> · Tulsa metro default · pan & zoom anywhere in Oklahoma
+  </div>
+
+  <div class="loading-overlay" id="loading-overlay">
+    <div class="loading-content">
+      <div class="loading-spinner"></div>
+      <div class="loading-text" id="loading-text">Generating Map</div>
+      <div class="loading-detail" id="loading-detail">Stitching tiles…</div>
+    </div>
+  </div>
+</main>
+
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const state = {
+  pageSize: 'letter',
+  pageW: 8.5,
+  pageH: 11,
+  orientation: 'portrait',
+  tool: 'none',
+  selection: null,
+  styleId: 'light-v11',
+  isRaster: false,
+  labelDensity: 'all',
+  labelSize: 1.0,
+  labelBold: false,
+  roadWeight: 'default',
+  hidePOIs: false,
+  map: null
+};
+
+// ============================================================
+// STYLE REGISTRY (mirror of api/generate-pdf.js)
+// ============================================================
+const STYLE_REGISTRY = {
+  // -- Standard Mapbox -----------------------------------------------------
+  'light-v11':              { provider: 'mapbox',        mapboxStylePath: 'mapbox/light-v11' },
+  'streets-v12':            { provider: 'mapbox',        mapboxStylePath: 'mapbox/streets-v12' },
+  'outdoors-v12':           { provider: 'mapbox',        mapboxStylePath: 'mapbox/outdoors-v12' },
+  'satellite-v9':           { provider: 'mapbox',        mapboxStylePath: 'mapbox/satellite-v9' },
+  'satellite-streets-v12':  { provider: 'mapbox',        mapboxStylePath: 'mapbox/satellite-streets-v12' },
+
+  // -- KLINEKRAFT (custom Studio JSON) -------------------------------------
+  'kk-carto':               { provider: 'mapbox-custom', mapboxStylePath: 'klinekraft/cmou53fe2001j01s448kk5v7j' },
+  'kk-carto-light':         { provider: 'mapbox-custom', mapboxStylePath: 'klinekraft/cmouag1xz001e01qrdv9v49np' },
+  'kk-carto-bright':        { provider: 'mapbox-custom', mapboxStylePath: 'klinekraft/cmouacmlr001d01qr7env8jrr' },
+  'kk-carto-heritage':      { provider: 'mapbox-custom', mapboxStylePath: 'klinekraft/cmouae103006j01rs9v0277d0' },
+  'kk-carto-mist':          { provider: 'mapbox-custom', mapboxStylePath: 'klinekraft/cmouahywv000t01qn7xl76op6' },
+  'kk-carto-midnight':      { provider: 'mapbox-custom', mapboxStylePath: 'klinekraft/cmouagu5i001a01rwfx147zyq' },
+  'kk-cb-mono':             { provider: 'mapbox-custom', mapboxStylePath: 'klinekraft/cmot54v7k00b401saabawemj2' },
+};
+
+function styleUrlFor(styleId) {
+  const entry = STYLE_REGISTRY[styleId];
+  if (!entry) return 'mapbox://styles/mapbox/light-v11';
+  if (entry.provider === 'mapbox' || entry.provider === 'mapbox-custom') {
+    return entry.mapboxStylePath ? `mapbox://styles/${entry.mapboxStylePath}` : 'mapbox://styles/mapbox/light-v11';
+  }
+  return 'mapbox://styles/mapbox/light-v11';
+}
+
+function isMapboxVectorStyle(styleId) {
+  const entry = STYLE_REGISTRY[styleId];
+  if (!entry) return false;
+  if (styleId === 'satellite-v9') return false;
+  return true;
+}
+
+// ============================================================
+// API KEY LOADING
+// ============================================================
+async function loadApiKeys() {
+  try {
+    const r = await fetch('/api/map-token');
+    if (r.ok) {
+      const d = await r.json();
+      if (d && d.token) mapboxgl.accessToken = d.token;
+    }
+  } catch (e) { console.warn('[token] fetch failed', e); }
+}
+
+// ============================================================
+// LAYER INTROSPECTION (broad pattern — catches custom layer IDs)
+// ============================================================
+const LAYER_PATTERNS = {
+  poi: /^poi[-_]/i,
+  anyLabel: /(label|^place[-_]|settlement)/i,
+  road: /^(road|tunnel|bridge)/i,
+  roadLabel: /(road[-_]?label|^road-.*-label)/i,
+  placeMajor: /(country|state|continent|settlement-large)/i,
+  placeMid:   /(settlement-medium|settlement-major|place-city|settlement-subdivision)/i,
+  placeMinor: /(settlement-small|place-town|place-village|^settlement$|place-suburb|place-neighbourhood|place-hamlet|place-island)/i
+};
+
+function eachLayerMatching(rxs, fn) {
+  if (!state.map || !state.map.getStyle()) return;
+  const layers = state.map.getStyle().layers || [];
+  for (const l of layers) {
+    if (rxs.some(rx => rx.test(l.id))) fn(l);
+  }
+}
+
+function applyAllLayerPrefs() {
+  if (!state.map) return;
+  applyLabelDensity();
+  applyLabelSize();
+  applyLabelWeight();
+  applyRoadWeight();
+  applyPOIToggle();
+}
+
+function applyLabelDensity() {
+  const d = state.labelDensity;
+  if (d === 'all') {
+    eachLayerMatching([LAYER_PATTERNS.placeMajor, LAYER_PATTERNS.placeMid, LAYER_PATTERNS.placeMinor], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'visible'); } catch {}
+    });
+  } else if (d === 'major') {
+    eachLayerMatching([LAYER_PATTERNS.placeMajor, LAYER_PATTERNS.placeMid], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'visible'); } catch {}
+    });
+    eachLayerMatching([LAYER_PATTERNS.placeMinor], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'none'); } catch {}
+    });
+  } else {
+    eachLayerMatching([LAYER_PATTERNS.placeMajor, LAYER_PATTERNS.placeMid, LAYER_PATTERNS.placeMinor], (l) => {
+      try { state.map.setLayoutProperty(l.id, 'visibility', 'none'); } catch {}
+    });
+  }
+}
+
+function applyLabelSize() {
+  const factor = state.labelSize;
+  eachLayerMatching([LAYER_PATTERNS.anyLabel], (l) => {
+    if (l.type !== 'symbol') return;
+    try {
+      let cur = state.map.getLayoutProperty(l.id, 'text-size');
+      if (cur && !l.__originalTextSize) l.__originalTextSize = JSON.parse(JSON.stringify(cur));
+      const orig = l.__originalTextSize ?? cur;
+      if (orig == null) return;
+      const scaled = scaleNumericExpr(orig, factor);
+      if (scaled != null) state.map.setLayoutProperty(l.id, 'text-size', scaled);
+    } catch {}
+  });
+}
+
+function applyLabelWeight() {
+  eachLayerMatching([LAYER_PATTERNS.anyLabel], (l) => {
+    if (l.type !== 'symbol') return;
+    try {
+      let cur = state.map.getLayoutProperty(l.id, 'text-font');
+      if (cur && !l.__originalTextFont) l.__originalTextFont = JSON.parse(JSON.stringify(cur));
+      const orig = l.__originalTextFont ?? cur;
+      if (!orig) return;
+      let next = state.labelBold ? swapFontTo(orig, 'bold') : orig;
+      state.map.setLayoutProperty(l.id, 'text-font', next);
+    } catch {}
+  });
+}
+
+function swapFontTo(value, target) {
+  if (Array.isArray(value)) return value.map(v => swapFontToString(v, target));
+  return value;
+}
+
+function swapFontToString(s, target) {
+  if (typeof s !== 'string') return s;
+  if (target === 'bold') {
+    if (/Bold/i.test(s)) return s;
+    if (/Regular/i.test(s)) return s.replace(/Regular/i, 'Bold');
+    if (/Medium/i.test(s)) return s.replace(/Medium/i, 'Bold');
+    return s + ' Bold';
+  }
+  return s;
+}
+
+function applyRoadWeight() {
+  const factor = state.roadWeight === 'subtle' ? 0.6 : (state.roadWeight === 'bold' ? 1.6 : 1.0);
+  eachLayerMatching([LAYER_PATTERNS.road], (l) => {
+    if (l.type !== 'line') return;
+    if (LAYER_PATTERNS.roadLabel.test(l.id)) return;
+    try {
+      let cur = state.map.getPaintProperty(l.id, 'line-width');
+      if (cur != null && !l.__originalLineWidth) l.__originalLineWidth = JSON.parse(JSON.stringify(cur));
+      const orig = l.__originalLineWidth ?? cur;
+      if (orig == null) return;
+      const scaled = scaleNumericExpr(orig, factor);
+      if (scaled != null) state.map.setPaintProperty(l.id, 'line-width', scaled);
+    } catch {}
+  });
+}
+
+function applyPOIToggle() {
+  eachLayerMatching([LAYER_PATTERNS.poi], (l) => {
+    try { state.map.setLayoutProperty(l.id, 'visibility', state.hidePOIs ? 'none' : 'visible'); } catch {}
+  });
+}
+
+function scaleNumericExpr(expr, factor) {
+  if (typeof expr === 'number') return expr * factor;
+  if (Array.isArray(expr)) {
+    if (expr[0] === 'interpolate' || expr[0] === 'interpolate-hcl' || expr[0] === 'interpolate-lab') {
+      const out = expr.slice(0, 3);
+      for (let i = 3; i < expr.length; i += 2) {
+        out.push(expr[i]);
+        const v = expr[i + 1];
+        out.push(typeof v === 'number' ? v * factor : v);
+      }
+      return out;
+    }
+    if (expr[0] === 'step') {
+      const out = [expr[0], expr[1], typeof expr[2] === 'number' ? expr[2] * factor : expr[2]];
+      for (let i = 3; i < expr.length; i += 2) {
+        out.push(expr[i]);
+        const v = expr[i + 1];
+        out.push(typeof v === 'number' ? v * factor : v);
+      }
+      return out;
+    }
+    if (expr[0] === 'literal' && typeof expr[1] === 'number') return ['literal', expr[1] * factor];
+    return expr;
+  }
+  return expr;
+}
+
+// ============================================================
+// SELECTION LAYERS
+// ============================================================
+function initSelectionLayers() {
+  if (!state.map) return;
+  if (state.map.getSource('selection-source')) return;
+  state.map.addSource('selection-source', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  state.map.addLayer({
+    id: 'selection-fill',
+    type: 'fill',
+    source: 'selection-source',
+    paint: { 'fill-color': '#000000', 'fill-opacity': 0.10 }
+  });
+  state.map.addLayer({
+    id: 'selection-line',
+    type: 'line',
+    source: 'selection-source',
+    paint: {
+      'line-color': '#000000',
+      'line-width': 2,
+      'line-dasharray': [3, 2]
+    }
+  });
+}
+
+function clearSelection() {
+  state.selection = null;
+  if (state.map && state.map.getSource('selection-source')) {
+    state.map.getSource('selection-source').setData({ type: 'FeatureCollection', features: [] });
+  }
+}
+
+function setCircleSelection(center, radiusMi) {
+  const poly = circleToPolygon(center, radiusMi, 96);
+  state.selection = { type: 'circle', center, radiusMi, polygon: poly };
+  if (state.map && state.map.getSource('selection-source')) {
+    state.map.getSource('selection-source').setData({
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [poly] } }]
+    });
+  }
+}
+
+function setRectSelection(sw, ne) {
+  const ring = [[sw[0], sw[1]], [ne[0], sw[1]], [ne[0], ne[1]], [sw[0], ne[1]], [sw[0], sw[1]]];
+  state.selection = { type: 'rect', sw, ne, polygon: ring };
+  if (state.map && state.map.getSource('selection-source')) {
+    state.map.getSource('selection-source').setData({
+      type: 'FeatureCollection',
+      features: [{ type: 'Feature', geometry: { type: 'Polygon', coordinates: [ring] } }]
+    });
+  }
+}
+
+function circleToPolygon(center, radiusMi, steps = 64) {
+  const [lon, lat] = center;
+  const rad = radiusMi * 1.609344;
+  const earth = 6371;
+  const out = [];
+  for (let i = 0; i <= steps; i++) {
+    const ang = (i * 2 * Math.PI) / steps;
+    const dx = (rad * Math.cos(ang)) / (earth * Math.cos(lat * Math.PI / 180));
+    const dy = (rad * Math.sin(ang)) / earth;
+    out.push([lon + dx * 180 / Math.PI, lat + dy * 180 / Math.PI]);
+  }
+  return out;
+}
+
+function fitToSelection() {
+  if (!state.selection || !state.map) return;
+  const poly = state.selection.polygon;
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const [x, y] of poly) {
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  state.map.fitBounds([[minX, minY], [maxX, maxY]], { padding: 80, duration: 600 });
+}
+
+function haversineMi(a, b) {
+  const R = 3958.8;
+  const toRad = (d) => d * Math.PI / 180;
+  const dLat = toRad(b[1] - a[1]);
+  const dLon = toRad(b[0] - a[0]);
+  const lat1 = toRad(a[1]);
+  const lat2 = toRad(b[1]);
+  const x = Math.sin(dLat/2)**2 + Math.cos(lat1)*Math.cos(lat2)*Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1-x));
+}
+
+// ============================================================
+// SELECTION HANDLERS
+// ============================================================
+let dragStart = null;
+
+function initSelectionHandlers() {
+  state.map.on('mousedown', (e) => {
+    if (state.tool === 'none') return;
+    dragStart = [e.lngLat.lng, e.lngLat.lat];
+    state.map.dragPan.disable();
+  });
+  state.map.on('mousemove', (e) => {
+    if (!dragStart) return;
+    const cur = [e.lngLat.lng, e.lngLat.lat];
+    if (state.tool === 'circle') {
+      const r = haversineMi(dragStart, cur);
+      setCircleSelection(dragStart, r);
+      document.getElementById('radius-input').value = r.toFixed(1);
+    } else if (state.tool === 'rect') {
+      const sw = [Math.min(dragStart[0], cur[0]), Math.min(dragStart[1], cur[1])];
+      const ne = [Math.max(dragStart[0], cur[0]), Math.max(dragStart[1], cur[1])];
+      setRectSelection(sw, ne);
+    }
+  });
+  state.map.on('mouseup', () => {
+    dragStart = null;
+    state.map.dragPan.enable();
+  });
+}
+
+// ============================================================
+// PAGE FRAME
+// ============================================================
+function currentPageDims() {
+  const isPortrait = state.orientation === 'portrait';
+  return isPortrait
+    ? { w: state.pageW, h: state.pageH }
+    : { w: state.pageH, h: state.pageW };
+}
+
+function currentPageAspect() {
+  const d = currentPageDims();
+  return d.w / d.h;
+}
+
+function updatePageFrame() {
+  const cont = document.getElementById('map-container');
+  const frame = document.getElementById('page-frame');
+  const lbl = document.getElementById('page-label');
+  if (!cont || !frame) return;
+  const cw = cont.clientWidth;
+  const ch = cont.clientHeight;
+  const margin = 60;
+  const aw = cw - margin * 2;
+  const ah = ch - margin * 2 - 40;
+  const aspect = currentPageAspect();
+  let fw, fh;
+  if (aw / aspect <= ah) { fw = aw; fh = aw / aspect; }
+  else                   { fh = ah; fw = ah * aspect; }
+  frame.style.width = fw + 'px';
+  frame.style.height = fh + 'px';
+  const d = currentPageDims();
+  lbl.textContent = `${d.w} × ${d.h} ${state.orientation.toUpperCase()}`;
+}
+
+function updateInfo() {
+  if (!state.map) return;
+  const c = state.map.getCenter();
+  const z = state.map.getZoom();
+  document.getElementById('info-center').textContent = `${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`;
+  document.getElementById('info-zoom').textContent = z.toFixed(2);
+  const metersPerPx = (40075016.686 * Math.cos(c.lat * Math.PI / 180)) / Math.pow(2, z + 8);
+  const milesPerInch = (metersPerPx * 96) / 1609.344;
+  const denom = Math.round(milesPerInch * 63360);
+  document.getElementById('info-scale').textContent = `1:${denom.toLocaleString()}`;
+  const d = currentPageDims();
+  const px = Math.round(d.w * 300) + ' × ' + Math.round(d.h * 300);
+  document.getElementById('info-output').textContent = px + ' px';
+}
+
+function updateStyleWarning() {
+  const w = document.getElementById('style-warning');
+  if (state.isRaster && (state.pageSize === 'tabloid' || state.pageSize === 'poster')) {
+    w.classList.add('visible');
+  } else {
+    w.classList.remove('visible');
+  }
+}
+
+// ============================================================
+// MAP INIT
+// ============================================================
+async function initMap() {
+  state.map = new mapboxgl.Map({
+    container: 'map',
+    style: styleUrlFor(state.styleId),
+    center: [-95.9928, 36.1539],
+    zoom: 9,
+    attributionControl: { compact: true }
+  });
+  state.map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
+
+  state.map.on('load', () => {
+    initSelectionLayers();
+    initSelectionHandlers();
+    applyAllLayerPrefs();
+    updatePageFrame();
+    updateInfo();
+  });
+  state.map.on('move', updateInfo);
+  state.map.on('styledata', () => {
+    initSelectionLayers();
+    applyAllLayerPrefs();
+  });
+}
+
+// ============================================================
+// PDF GENERATION
+// ============================================================
+async function generatePdf() {
+  const btn = document.getElementById('download-btn');
+  const stat = document.getElementById('download-status');
+  const overlay = document.getElementById('loading-overlay');
+  const detail = document.getElementById('loading-detail');
+
+  btn.disabled = true;
+  stat.textContent = 'Generating…';
+  stat.className = 'download-status';
+  overlay.classList.add('visible');
+
+  try {
+    const d = currentPageDims();
+    const frameEl = document.getElementById('page-frame');
+    const fw = frameEl.clientWidth;
+    const fh = frameEl.clientHeight;
+
+    const containerRect = state.map.getContainer().getBoundingClientRect();
+    const frameRect = frameEl.getBoundingClientRect();
+    const localX = frameRect.left - containerRect.left;
+    const localY = frameRect.top - containerRect.top;
+
+    // Geographic bounds of the framed rectangle (informational; backend
+    // recomputes its own bounds from center+zoom for selection-overlay
+    // positioning).
+    const sw = state.map.unproject([localX, localY + fh]);
+    const ne = state.map.unproject([localX + fw, localY]);
+
+    // Geographic center of the framed rectangle.
+    const center = state.map.unproject([localX + fw / 2, localY + fh / 2]);
+
+    // Compute the zoom level that, when paired with the print's logical
+    // pixel dimensions, will render EXACTLY the framed geographic area.
+    //
+    // At zoom z, lng-per-logical-px = 360 / (256 * 2^z).
+    // We want: total_logical_px = page_inches * 150 (because @2x retina
+    // means output_px = 2 * logical, and we target 300 DPI → 300/2 = 150
+    // logical px per inch).
+    // We need: total_logical_px * (360 / (256 * 2^z)) = lng_span
+    // → 2^z = total_logical_px * 360 / (256 * lng_span)
+    // → z = log2(total_logical_px * 360 / (256 * lng_span))
+    const lngSpan = Math.abs(ne.lng - sw.lng);
+    const totalLogicalW = d.w * 150;  // pageWidthIn * (300dpi / 2 retina factor)
+    const computedZoom = Math.log2((totalLogicalW * 360) / (256 * lngSpan));
+
+    // Clamp to Mapbox's supported range
+    const zoom = Math.max(0, Math.min(22, computedZoom));
+
+    const body = {
+      bounds: { west: sw.lng, south: sw.lat, east: ne.lng, north: ne.lat },
+      center: { lng: center.lng, lat: center.lat },
+      zoom: zoom,
+      pageWidthIn: d.w,
+      pageHeightIn: d.h,
+      styleId: state.styleId,
+      accentColor: '#000000',
+      selection: state.selection ? {
+        type: state.selection.type,
+        center: state.selection.center,
+        radiusMi: state.selection.radiusMi,
+        sw: state.selection.sw,
+        ne: state.selection.ne
+      } : null
+    };
+
+    detail.textContent = 'Rendering map…';
+    const r = await fetch('/api/generate-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!r.ok) {
+      const txt = await r.text();
+      throw new Error(txt || ('HTTP ' + r.status));
+    }
+    detail.textContent = 'Saving PDF…';
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `wallmap-${state.styleId}-${state.pageSize}-${state.orientation}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+
+    stat.textContent = 'Done — saved';
+    stat.className = 'download-status success';
+  } catch (e) {
+    console.error(e);
+    stat.textContent = 'Error — try again';
+    stat.className = 'download-status error';
+  } finally {
+    btn.disabled = false;
+    overlay.classList.remove('visible');
+  }
+}
+
+// ============================================================
+// EVENT WIRING
+// ============================================================
+function wireEvents() {
+  // Style buttons
+  document.querySelectorAll('.style-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      document.querySelectorAll('.style-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      state.styleId = btn.dataset.style;
+      state.isRaster = btn.dataset.raster === 'true';
+      const url = styleUrlFor(state.styleId);
+      try {
+        state.map.setStyle(url);
+      } catch (e) { console.error('setStyle failed', e); }
+      updateStyleWarning();
+    });
+  });
+
+  // Label density
+  document.querySelectorAll('#label-density button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#label-density button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.labelDensity = b.dataset.density;
+      applyLabelDensity();
+    });
+  });
+
+  // Label size
+  const sizeIn = document.getElementById('label-size');
+  const sizeVal = document.getElementById('label-size-val');
+  sizeIn.addEventListener('input', (e) => {
+    state.labelSize = parseFloat(e.target.value);
+    sizeVal.textContent = state.labelSize.toFixed(2) + '×';
+    applyLabelSize();
+  });
+
+  // Bold labels
+  const boldT = document.getElementById('label-bold-toggle');
+  function toggleBold() {
+    state.labelBold = !state.labelBold;
+    boldT.classList.toggle('on', state.labelBold);
+    boldT.setAttribute('aria-checked', state.labelBold);
+    applyLabelWeight();
+  }
+  boldT.addEventListener('click', toggleBold);
+  boldT.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleBold(); } });
+
+  // Road weight
+  document.querySelectorAll('#road-weight button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#road-weight button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.roadWeight = b.dataset.weight;
+      applyRoadWeight();
+    });
+  });
+
+  // POI toggle
+  const poiT = document.getElementById('poi-toggle');
+  function togglePoi() {
+    state.hidePOIs = !state.hidePOIs;
+    poiT.classList.toggle('on', state.hidePOIs);
+    poiT.setAttribute('aria-checked', state.hidePOIs);
+    applyPOIToggle();
+  }
+  poiT.addEventListener('click', togglePoi);
+  poiT.addEventListener('keydown', (e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePoi(); } });
+
+  // Page size
+  document.querySelectorAll('.size-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('.size-btn').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.pageSize = b.dataset.size;
+      state.pageW = parseFloat(b.dataset.w);
+      state.pageH = parseFloat(b.dataset.h);
+      updatePageFrame();
+      updateInfo();
+      updateStyleWarning();
+    });
+  });
+
+  // Orientation
+  document.querySelectorAll('#orient-row button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#orient-row button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.orientation = b.dataset.orient;
+      updatePageFrame();
+      updateInfo();
+    });
+  });
+
+  // Tool
+  document.querySelectorAll('#tool-row button').forEach(b => {
+    b.addEventListener('click', () => {
+      document.querySelectorAll('#tool-row button').forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      state.tool = b.dataset.tool;
+      document.getElementById('circle-controls').style.display = state.tool === 'circle' ? 'block' : 'none';
+      document.getElementById('rect-controls').style.display = state.tool === 'rect' ? 'block' : 'none';
+      document.getElementById('none-controls').style.display = state.tool === 'none' ? 'block' : 'none';
+      if (state.tool === 'none') clearSelection();
+    });
+  });
+
+  // Radius input
+  document.getElementById('radius-input').addEventListener('change', (e) => {
+    const r = parseFloat(e.target.value);
+    if (state.selection && state.selection.type === 'circle' && r > 0) {
+      setCircleSelection(state.selection.center, r);
+    }
+  });
+
+  // Download
+  document.getElementById('download-btn').addEventListener('click', generatePdf);
+
+  // Resize
+  window.addEventListener('resize', () => {
+    updatePageFrame();
+    if (state.map) state.map.resize();
+  });
+}
+
+// ============================================================
+// BOOT
+// ============================================================
+(async function() {
+  await loadApiKeys();
+  await initMap();
+  wireEvents();
+  updatePageFrame();
+})();
+</script>
+</body>
+</html>
