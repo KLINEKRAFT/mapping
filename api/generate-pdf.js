@@ -1,10 +1,15 @@
-// /api/generate-pdf.js — v1.7.1
-//   * 7 KK Carto Studio styles wired (Light / Bright / Heritage / Mist /
-//     Midnight / KK Carto / CB Blue Mono)
-//   * Stadia provider removed entirely
-//   * Mapbox static images now use center+zoom (was bbox) — fixes
-//     the overshoot-bounds bug and the tiny-labels bug. Backend
-//     also recomputes bounds from center+zoom for selection overlay.
+// /api/generate-pdf.js — v1.8.0
+//   * Single-image rendering replaces the multi-tile stitch. Stitched tiles
+//     produced two visible bugs: (a) labels at tile seams clipped/duplicated
+//     because Mapbox static images anchor labels per-image, and (b) when
+//     targeting 300 DPI the per-tile zoom level pushed every label down to
+//     ~6 pt on the printed page (Mapbox renders labels in logical pixels;
+//     1 logical px = 1/150 inch at 300 DPI / @2x).
+//   * The new fetch sends a single Mapbox static image sized to fit within
+//     the 1280-logical-px limit while matching page aspect, then scales it
+//     up to fill the PDF page. Effective DPI varies by page size
+//     (~232 letter / ~150 tabloid / ~128 poster) but labels render at a
+//     readable physical size and there are no seams.
 
 import { PDFDocument, rgb } from 'pdf-lib';
 
@@ -106,8 +111,7 @@ function resolveStyle(styleId) {
 // ============================================================
 // CONSTANTS
 // ============================================================
-const MAPBOX_MAX_TILE_LOGICAL = 1280;  // Mapbox limit
-const TARGET_DPI = 300;
+const MAPBOX_MAX_LOGICAL = 1280;  // Mapbox static-images per-side limit
 
 // ============================================================
 // HANDLER
@@ -132,8 +136,6 @@ async function handler(request) {
 
   const {
     bounds,
-    center,
-    zoom,
     pageWidthIn,
     pageHeightIn,
     selection,
@@ -144,33 +146,65 @@ async function handler(request) {
   if (!bounds || !pageWidthIn || !pageHeightIn) {
     return new Response('Missing required fields', { status: 400 });
   }
-  if (!center || typeof zoom !== 'number') {
-    return new Response('Missing center or zoom', { status: 400 });
+  if (typeof bounds.west !== 'number' || typeof bounds.east !== 'number' ||
+      typeof bounds.north !== 'number' || typeof bounds.south !== 'number') {
+    return new Response('Invalid bounds', { status: 400 });
   }
 
   const style = resolveStyle(styleId);
+  if (style.provider !== 'mapbox' && style.provider !== 'mapbox-custom') {
+    return new Response(`Unknown provider: ${style.provider}`, { status: 400 });
+  }
   const accent = parseHexToRgb(accentColor) || rgb(1.0, 0.357, 0.016);
 
-  const outW = Math.round(pageWidthIn * TARGET_DPI);
-  const outH = Math.round(pageHeightIn * TARGET_DPI);
+  // Pick a logical-pixel size that matches the page aspect and fits in
+  // Mapbox's 1280-per-side static-image budget. The longer side gets 1280;
+  // the shorter side scales down. The PDF page then upscales the image to
+  // fill the print area.
+  const pageAspect = pageWidthIn / pageHeightIn;
+  let logicalW, logicalH;
+  if (pageAspect >= 1) {
+    logicalW = MAPBOX_MAX_LOGICAL;
+    logicalH = Math.max(1, Math.round(logicalW / pageAspect));
+  } else {
+    logicalH = MAPBOX_MAX_LOGICAL;
+    logicalW = Math.max(1, Math.round(logicalH * pageAspect));
+  }
 
-  // Compute the EXACT geographic bounds that will be rendered, given center
-  // and zoom. This must use the same Web Mercator math the tile fetcher uses
-  // so the selection overlay lines up perfectly with the rendered map.
-  const renderedBounds = computeBoundsFromCenterZoom(center, zoom, outW, outH);
+  // Center + zoom from the framed bounds. The user framed an exact lng span
+  // in the live preview; we pick the zoom that packs that span into logicalW.
+  const center = {
+    lng: (bounds.west + bounds.east) / 2,
+    lat: (bounds.north + bounds.south) / 2,
+  };
+  const lngSpan = Math.abs(bounds.east - bounds.west);
+  if (!(lngSpan > 0)) {
+    return new Response('Degenerate bounds (zero lng span)', { status: 400 });
+  }
+  const rawZoom = Math.log2((logicalW * 360) / (256 * lngSpan));
+  const zoom = Math.max(0, Math.min(22, rawZoom));
+
+  // Re-derive the bounds the static image will actually cover. The framed
+  // bounds may have a slightly different lat span than what fits the page
+  // aspect at this zoom (Mercator distortion at non-zero latitude); the
+  // selection overlay needs the rendered bounds, not the requested ones.
+  const renderedBounds = computeBoundsFromCenterZoom(center, zoom, logicalW, logicalH);
 
   // ============================================================
-  // FETCH + LAY OUT TILES (provider-specific)
+  // FETCH SINGLE STATIC IMAGE
   // ============================================================
-  let tileBuffers;
+  let imageBuffer;
+  let imageIsJpeg;
   try {
-    if (style.provider === 'mapbox' || style.provider === 'mapbox-custom') {
-      tileBuffers = await fetchMapboxTiles({
-        center, zoom, outW, outH, style, mapboxToken,
-      });
-    } else {
-      return new Response(`Unknown provider: ${style.provider}`, { status: 400 });
-    }
+    const url =
+      `https://api.mapbox.com/styles/v1/${style.mapboxStylePath}/static/` +
+      `${center.lng.toFixed(6)},${center.lat.toFixed(6)},${zoom.toFixed(4)},0/` +
+      `${logicalW}x${logicalH}@2x` +
+      `?access_token=${mapboxToken}&attribution=false&logo=false`;
+
+    const fetched = await fetchImage(url);
+    imageBuffer = fetched.buffer;
+    imageIsJpeg = fetched.isJpeg;
   } catch (e) {
     return new Response(`Tile fetch failed: ${e.message}`, { status: 502 });
   }
@@ -184,7 +218,7 @@ async function handler(request) {
     const pageHPts = pageHeightIn * 72;
     const page = pdfDoc.addPage([pageWPts, pageHPts]);
 
-    // White background under everything (in case tiles have transparency)
+    // White background in case the embedded image has transparency.
     page.drawRectangle({
       x: 0, y: 0,
       width: pageWPts,
@@ -192,23 +226,15 @@ async function handler(request) {
       color: rgb(1, 1, 1),
     });
 
-    for (const t of tileBuffers) {
-      try {
-        const img = t.isJpeg
-          ? await pdfDoc.embedJpg(t.buffer)
-          : await pdfDoc.embedPng(t.buffer);
+    const img = imageIsJpeg
+      ? await pdfDoc.embedJpg(imageBuffer)
+      : await pdfDoc.embedPng(imageBuffer);
 
-        page.drawImage(img, {
-          x: t.xPts,
-          y: t.yPts,
-          width: t.widthPts,
-          height: t.heightPts,
-        });
-      } catch (tileErr) {
-        // Skip individual bad tiles rather than crash the whole PDF
-        console.error(`Skipping bad tile at ${t.xPts},${t.yPts}: ${tileErr.message}`);
-      }
-    }
+    page.drawImage(img, {
+      x: 0, y: 0,
+      width: pageWPts,
+      height: pageHPts,
+    });
 
     if (selection) {
       drawSelectionOverlay(page, selection, renderedBounds, pageWPts, pageHPts, accent);
@@ -230,104 +256,10 @@ async function handler(request) {
 }
 
 // ============================================================
-// MAPBOX FETCH (center+zoom-based static images)
+// FETCH HELPER
 // ============================================================
-// Why center+zoom instead of bbox:
-//   * bbox-based requests pad the image to maintain the URL's WxH
-//     aspect ratio, which means the rendered area extends past the
-//     bounds the user actually framed.
-//   * bbox-based requests render labels at a "fit-to-image" size,
-//     so a poster at 6000x4800 gets labels much smaller than what
-//     the user saw at zoom 9 in the live preview.
-//   * center+zoom requests render labels at their natural zoom-relative
-//     size, exactly matching the live mapbox-gl preview.
-async function fetchMapboxTiles({ center, zoom, outW, outH, style, mapboxToken }) {
-  // Mapbox @2x means returned image is 2x logical size, so logical = pixels/2
-  const totalLogicalW = Math.ceil(outW / 2);
-  const totalLogicalH = Math.ceil(outH / 2);
-
-  const cols = Math.ceil(totalLogicalW / MAPBOX_MAX_TILE_LOGICAL);
-  const rows = Math.ceil(totalLogicalH / MAPBOX_MAX_TILE_LOGICAL);
-  const tileLogicalW = Math.ceil(totalLogicalW / cols);
-  const tileLogicalH = Math.ceil(totalLogicalH / rows);
-
-  if (tileLogicalW > MAPBOX_MAX_TILE_LOGICAL || tileLogicalH > MAPBOX_MAX_TILE_LOGICAL) {
-    throw new Error('Tile size exceeds Mapbox limits');
-  }
-
-  // Each tile is `tileLogicalW x tileLogicalH` logical px (= 2x pixel px @2x).
-  // Total grid: rows*cols tiles. Compute center for each tile by offsetting
-  // from the requested center using Web Mercator pixel math.
-  //
-  // At zoom z, 256 logical px = 360deg / 2^z of longitude (constant).
-  // Latitude is non-linear (Mercator) — we go via mercator y, offset, invert.
-
-  const totalPxW = cols * tileLogicalW;  // total grid in logical px
-  const totalPxH = rows * tileLogicalH;
-
-  const lngPerLogicalPx = 360 / (256 * Math.pow(2, zoom));
-
-  // Page geometry in PDF points
-  const pageHPts = outH * (72 / TARGET_DPI);
-  const cellWPts = (outW / cols) * (72 / TARGET_DPI);
-  const cellHPts = (outH / rows) * (72 / TARGET_DPI);
-
-  // For latitude: convert center to Mercator Y (pixel coords at this zoom),
-  // offset, convert back. Mercator Y formula:
-  //   y_px = (1 - log(tan(lat) + sec(lat)) / PI) / 2 * 256 * 2^zoom
-  function latToMercY(lat) {
-    const r = lat * Math.PI / 180;
-    return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * 256 * Math.pow(2, zoom);
-  }
-  function mercYToLat(y) {
-    const r = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / (256 * Math.pow(2, zoom)))));
-    return r * 180 / Math.PI;
-  }
-
-  const centerMercY = latToMercY(center.lat);
-
-  const tileSpecs = [];
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      // Tile's center in logical pixel offset from the overall center
-      // (logical px relative to page-center-pixel-coordinate).
-      const tileCenterPxX = (c + 0.5) * tileLogicalW - totalPxW / 2;
-      const tileCenterPxY = (r + 0.5) * tileLogicalH - totalPxH / 2;
-
-      const tileLng = center.lng + tileCenterPxX * lngPerLogicalPx;
-      const tileLat = mercYToLat(centerMercY + tileCenterPxY);
-
-      // Mapbox accepts up to 6 decimal precision for static image params
-      const lonStr = tileLng.toFixed(6);
-      const latStr = tileLat.toFixed(6);
-      const zoomStr = zoom.toFixed(4);
-
-      const url = `https://api.mapbox.com/styles/v1/${style.mapboxStylePath}/static/${lonStr},${latStr},${zoomStr},0/${tileLogicalW}x${tileLogicalH}@2x?access_token=${mapboxToken}&attribution=false&logo=false`;
-
-      tileSpecs.push({
-        url,
-        isJpeg: style.isJpeg,
-        xPts: c * cellWPts,
-        // PDF y origin is bottom-left; row 0 is top of page, so flip.
-        yPts: pageHPts - (r + 1) * cellHPts,
-        widthPts: cellWPts,
-        heightPts: cellHPts,
-      });
-    }
-  }
-
-  return await fetchAll(tileSpecs);
-}
-
-// ============================================================
-// FETCH HELPERS
-// ============================================================
-async function fetchAll(specs) {
-  return await Promise.all(specs.map(fetchOne));
-}
-
-async function fetchOne(spec) {
-  const res = await fetch(spec.url);
+async function fetchImage(url) {
+  const res = await fetch(url);
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`HTTP ${res.status} ${text.slice(0, 200)}`);
@@ -338,14 +270,13 @@ async function fetchOne(spec) {
     throw new Error(`Expected image but got ${ct}: ${text.slice(0, 200)}`);
   }
   const buffer = await res.arrayBuffer();
-  // Magic-byte sanity check
   const bytes = new Uint8Array(buffer);
   const isPng = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47;
   const isJpeg = bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF;
   if (!isPng && !isJpeg) {
     throw new Error(`Buffer is neither PNG nor JPEG (first bytes: ${[...bytes.slice(0,4)].map(b=>b.toString(16)).join(' ')})`);
   }
-  return { ...spec, buffer };
+  return { buffer, isJpeg };
 }
 
 // ============================================================
@@ -365,16 +296,14 @@ function lngLatToPagePts(lng, lat, bounds, pageWPts, pageHPts) {
   return { x, y };
 }
 
-// Compute the geographic bounds that a static map at the given center+zoom
-// will cover, given output dimensions in pixels. Uses the same Web Mercator
-// math as fetchMapboxTiles so the rendered area and these bounds match.
-function computeBoundsFromCenterZoom(center, zoom, outW, outH) {
-  const totalLogicalW = Math.ceil(outW / 2);
-  const totalLogicalH = Math.ceil(outH / 2);
-
+// Compute the geographic bounds the static image will cover, given the
+// center, zoom, and the image's logical-pixel size. Mapbox's static API
+// uses Web Mercator and renders at the requested logical size; we mirror
+// that math so the selection overlay lines up with the rendered map.
+function computeBoundsFromCenterZoom(center, zoom, logicalW, logicalH) {
   const lngPerLogicalPx = 360 / (256 * Math.pow(2, zoom));
-  const halfW = totalLogicalW / 2;
-  const halfH = totalLogicalH / 2;
+  const halfW = logicalW / 2;
+  const halfH = logicalH / 2;
 
   const west = center.lng - halfW * lngPerLogicalPx;
   const east = center.lng + halfW * lngPerLogicalPx;
